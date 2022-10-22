@@ -1,0 +1,16 @@
+{
+   "proofs_submission_fields": [
+      {
+         "type": "text",
+         "textarea_id": "proof_1"
+      },
+      {
+         "type": "text",
+         "textarea_id": "proof_2"
+      },
+      {
+         "type": "text",
+         "textarea_id": "proof_3"
+      }
+   ]
+}

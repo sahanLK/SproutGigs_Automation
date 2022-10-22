@@ -1,0 +1,61 @@
+                </div><!--col-sm-12-->
+            </div><!--row-->
+        </div><!-- container-fluid -->
+    </body>
+    <footer>
+        <script src="https://code.jquery.com/jquery-3.6.1.js" integrity="sha256-3zlB5s2uwoUzrXK3BT7AX3FyvojsraNFxCc2vC/7pNI=" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            /* Setting the actual values */
+            /* Window */
+            $('#innerwidth').text(window.innerWidth);
+            $('#innerheight').text(window.innerHeight);
+            $('#outerwidth').text(window.outerWidth);
+            $('#outerheight').text(window.outerHeight);
+
+            /* Window.Navigator */
+            $('#useragent').text(window.navigator.userAgent);
+            $('#cookieenabled').text(window.navigator.cookieEnabled);
+            $('#appcodename').text(window.navigator.appCodeName);
+            $('#platform').text(window.navigator.platform);
+            $('#webdriver').text(window.navigator.webdriver);
+            $('#devicememory').text(window.navigator.deviceMemory);
+
+            /* Window.Screen */
+            $('#width').text(window.screen.width);
+            $('#height').text(window.screen.height);
+            $('#availwidth').text(window.screen.availWidth);
+            $('#availheight').text(window.screen.availHeight);
+            $('#colordepth').text(window.screen.colorDepth);
+            $('#pixeldepth').text(window.screen.pixelDepth);
+            console.log("Updated actual values successfully from Footer.txt");
+
+            /* Changing the colors if the configured to and actual values don't match */
+            $( document ).ready( function() {
+                try {
+                    var tBodies = $('tbody');   // all table bodies
+                    $.each(tBodies, function(index, tBody) {
+                        var tRows = $(tBody).find('tr');    // all table roes
+                        $.each(tRows, function( index, tRow ) {
+                            var tDatas = $(tRow).find('td');    // all tds in current tr
+                            var configuredTo = $(tDatas[1]).text();
+                            var actual = $(tDatas[2]).text();
+
+                            /* Change python bools into Js bools */
+                            configuredTo = ( configuredTo == 'True' ) ? 'true': configuredTo;
+                            configuredTo = ( configuredTo == 'False' ) ? 'false': configuredTo;
+                            actual = ( actual == 'True' ) ? 'true': actual;
+                            actual = ( actual == 'False' ) ? 'false': actual;
+
+                            if( configuredTo != actual) {
+                                $(tRow).css({"background-color": "red", "color": "white"});
+                            }
+                        });
+                    });
+                } catch( err ) {
+                    alert("Error when changing colors:\n", err.name, '\n', err.message);
+                }
+            });
+        </script>
+    </footer>
+</html>

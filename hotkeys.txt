@@ -1,0 +1,15 @@
+"<alt>+b": Blog Url
+"<alt>+t": Post Title
+"<alt>+s": Last Sentence
+"<alt>+w": last Word
+"<alt>+f": First opened ad url
+"<alt>+a": Ad about url
+"<alt>+c": Ad contact url,
+"<alt>+i": Ad inside link,
+
+"<alt>+1": Change the selected textarea no,
+f12 : Clear textarea (that selected by <alt>+1).
+
+<alt>+h : Hide current job,
+<insert> : Submit the completed task
+<delete> : Skip current job

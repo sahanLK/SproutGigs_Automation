@@ -1,0 +1,10 @@
+        <!-- Don't remove below form-group because it is removed when storing submission fields.
+         If you remove it now, errors will be generated at submission -->
+        <div class="form-group form-label-over d-flex justify-content-between form-label-over--is-not-filled" style="display: None">
+            <a href="https://picoworkers.com/jobs.php" class="btn btn-gray btn-lg">Cancel</a>
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-proof-btn">Submit Proofs</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

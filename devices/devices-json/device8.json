@@ -1,0 +1,27 @@
+{
+  "browser": {
+    "name": null,
+    "appCodeName": "",
+    "userAgent": "",
+    "version": "",
+    "cookies": true,
+    "flash": false,
+    "webGL": true
+  },
+  "device": {
+    "platform": "",
+    "screenWidth": 1280,
+    "screenHeight": 720,
+    "innerWidth": 50,
+    "innerHeight": 100,
+    "availWidth": 0,
+    "availHeight": 0,
+    "screenColorDepth": 0,
+    "screenPixelDepth": 0,
+    "memory": 12,
+    "gpu": null,
+    "batteryCharging": true,
+    "batteryLevel": 40,
+    "language": "en-us"
+  }
+}

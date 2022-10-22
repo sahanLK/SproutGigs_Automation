@@ -1,0 +1,289 @@
+
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">1: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Enter the last text you accessed in step 3
+            </label>
+            <textarea id="proof_1" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">2: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                CODEHint: F*** *******H
+            </label>
+            <textarea id="proof_2" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">3: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Please give Second URL's of the website you visited in step 3
+            </label>
+            <textarea id="proof_3" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">4: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                1st 2 proof from proof section
+            </label>
+            <textarea id="proof_4" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">5: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit 2 URLs have you visited from last step (must be 2 URLs)
+            </label>
+            <textarea id="proof_5" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">6: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                The Url of the 7th publication visited
+            </label>
+            <textarea id="proof_6" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">7: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Send me your country and your number of visits
+            </label>
+            <textarea id="proof_7" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">8: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Follow Step 3 To submit Proof 3
+            </label>
+            <textarea id="proof_8" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">9: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                First URL on our website that you visit from Google
+            </label>
+            <textarea id="proof_9" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">10: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Keyword search link
+            </label>
+            <textarea id="proof_10" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">11: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit the ABOUT US URL and CONTACT US URL proof you copied in step 5 on Pastebin
+            </label>
+            <textarea id="proof_11" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">12: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Please give the last COMPLETE sentence of the 2nd Url of the page you visited in step 4
+            </label>
+            <textarea id="proof_12" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">13: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Main URL of the site clicked
+            </label>
+            <textarea id="proof_13" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">14: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Link to 6th blogs you visited
+            </label>
+            <textarea id="proof_14" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">15: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Second proof from proof section
+            </label>
+            <textarea id="proof_15" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">16: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit the first sentence you see during step 4
+            </label>
+            <textarea id="proof_16" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">17: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Please give First URL's of the website you visited in step 3
+            </label>
+            <textarea id="proof_17" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">18: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Send last  website URL you visited.
+            </label>
+            <textarea id="proof_18" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">19: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit the first sentence of the page opened after Step 2
+            </label>
+            <textarea id="proof_19" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">20: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Follow the step 4 to submit proof 4
+            </label>
+            <textarea id="proof_20" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">21: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Your IP address which you are using while doing my task
+            </label>
+            <textarea id="proof_21" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">22: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Send token proof
+            </label>
+            <textarea id="proof_22" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">23: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Please give the last COMPLETE sentence of the 2nd Url of the page you visited
+            </label>
+            <textarea id="proof_23" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">24: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                your IP address
+            </label>
+            <textarea id="proof_24" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">25: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Any 2 visited website Urls
+            </label>
+            <textarea id="proof_25" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">26: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit the last sentence of the ABOUT US page of the website you visited in step 4
+            </label>
+            <textarea id="proof_26" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">27: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Write any 2 visited website Urls
+            </label>
+            <textarea id="proof_27" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">28: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Please submit the last sentence of the ABOUT US and CONTACT US pages or their URLs of the website you Clicked in step 5:In case If you didn't see contact Us or about Us page.* Compulsory must Submit two URLs or their last statements
+            </label>
+            <textarea id="proof_28" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">29: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Link Sitemap
+            </label>
+            <textarea id="proof_29" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">30: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Follow the step 4 to submit proof 3
+            </label>
+            <textarea id="proof_30" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">31: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                step 3
+            </label>
+            <textarea id="proof_31" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">32: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Follow Step 3 To submit Proof 1
+            </label>
+            <textarea id="proof_32" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">33: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Last 2 url of my website
+            </label>
+            <textarea id="proof_33" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">34: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Submit the first sentence on the page
+            </label>
+            <textarea id="proof_34" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">35: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Url of the website you visited
+            </label>
+            <textarea id="proof_35" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 10px;">
+            <h3 style="font-weight: 700; margin-bottom: 0px">36: </h3>
+            <label for="proof_2" style="font-size: 18px; font-weight: 600; color: rgb(107, 107, 71); margin-bottom: 0px;">
+                Follow Step 3 To submit Proof 2
+            </label>
+            <textarea id="proof_36" maxlength="2000" cols="30" rows="4" class="form-control"></textarea>
+        </div>
+        
