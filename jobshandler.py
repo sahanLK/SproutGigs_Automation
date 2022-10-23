@@ -91,7 +91,7 @@ class JobsHandler(TabsHandler):
             sys_logger.critical(f"Unexpected error while getting a Job ID: {e}")
 
         job_url = f'{DOING_JOB_PAGE_INITIALS}{self.current_job_id}'
-        open_url(job_url)
+        open_url(job_url, '_blank')
 
         # If the current job has expired, select another job
         if not self.go_to_doing_job_tab():
@@ -131,14 +131,13 @@ class JobsHandler(TabsHandler):
         links_no_http = [f"https://{url.group(0).strip()}" for url in RE_NO_HTTP_LINK.finditer(str(ji))]
         sys_logger.debug(f"Found Non-Http Links: {len(links_no_http)} from Ji_section")
         if (len(links_http) >= 8) or (len(links_no_http) >= 8):
-            print("Too many urls found. Not opening anything.")
+            sys_logger.debug("Too many urls found. Not opening anything.")
             return
 
         links_http.update(links_no_http)
         sys_logger.debug(f"Total links from ji_section: {len(links_http)}")
         for url in links_http:
-            open_url(url)
-            print(url)
+            open_url(url, '_blank')
 
     def __get_job_page_source(self):
         try:

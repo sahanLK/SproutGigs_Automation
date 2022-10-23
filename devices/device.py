@@ -3,12 +3,14 @@ import json
 import logging
 import os.path
 from subprocess import CREATE_NO_WINDOW
+from typing import Union
 
 from selenium import webdriver
 import pathlib
 from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.chrome.service import Service as ChromeService
 from functions.fns import get_file_logger, get_syslogger
+from livecontrols import LiveControls
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 
@@ -121,7 +123,7 @@ class _BaseDevice:
             self.common_options.append("--disable-webgl")  # Disabling WebGl
         self.common_options.append(f'--user-agent={self.navigatorUserAgent}')
 
-    def execute_spoofing_cdp_js(self) -> bool:
+    def __execute_spoofing_cdp_js(self) -> bool:
         script = """
         (function(platform, screenWidth, screenAvailWidth, windowOuterWidth, windowInnerWidth,
         screenHeight, screenAvailHeight, windowOuterHeight, windowInnerHeight,screenColorDepth,
@@ -245,7 +247,7 @@ class _BaseDevice:
 
     def _load_config_page(self):
         """
-        Loads the generated js config html page into the current active tab.
+        Loads the generated configs.html file into the current active tab.
         :return:
         """
         logger.info("Loading html file")
@@ -255,11 +257,47 @@ class _BaseDevice:
                 raise FileNotFoundError
             self.driver.get(f"file://{file}")
             logger.info("Html file loaded")
+
+            # Try to execute javascript for checking the settings really applied or
             return True
         except FileNotFoundError:
             logger.error("configs.html not found.")
         except Exception as e:
             logger.error(f"Html file loading error: {e}")
+
+    def _load_actual_configs(self):
+        """
+        Display the actual configuration of the browser or device.
+        :return:
+        """
+        self.driver.execute_script(open("src/display-actual-configs.js").read())
+
+    def _compare_configs(self):
+        """
+        Check al the actual values and configured values are equal or not.
+        :return:
+        """
+        if self.driver.execute_script(open('src/compare-configs.js').read()):
+            return True
+
+    def open_url(self, url: str, target: str) -> None:
+        allowed_targets = ['_self', '_blank']
+        if target not in allowed_targets:
+            logger.critical(f"Invalid target parameter was passed in: {target}. Not opening: {url}")
+            return
+
+        try:
+            if target == '_blank':
+                self.driver.switch_to.new_window(type_hint='tab')
+            self.__execute_spoofing_cdp_js()
+            self._load_config_page()
+            self._load_actual_configs()
+            if self._compare_configs():
+                self.driver.get(url)
+            else:
+                sys_logger.critical(f"Configuration mismatch. Not opening {url}")
+        except Exception as e:
+            logger.error(f'Error opening link : {url}: {e}')
 
 
 class DeviceWithEdge(_BaseDevice):
@@ -336,7 +374,7 @@ class DeviceWithEdge(_BaseDevice):
             service=self.service,
             executable_path='msedgedriver.exe')
         logger.info("Executing Spoofing CDP js")
-        self.execute_spoofing_cdp_js()
+        self.__execute_spoofing_cdp_js()
 
         if not self._generate_html():
             return
@@ -388,7 +426,7 @@ class DeviceWithChrome(_BaseDevice):
             service=self.service,
             executable_path='msedgedriver.exe')
         logger.info("Executing Spoofing CDP js")
-        self.execute_spoofing_cdp_js()
+        self.__execute_spoofing_cdp_js()
 
         if not self._generate_html():
             return
@@ -398,6 +436,12 @@ class DeviceWithChrome(_BaseDevice):
 
 
 if __name__ == "__main__":
-    device = DeviceWithEdge(device_no=0)
+    device = DeviceWithEdge(device_no=1)
     driver = device.get_driver()
-    print(driver)
+
+    for _ in range(5):
+        device.open_url(f"https://google.com", "_blank")
+
+
+    input()
+    driver.quit()

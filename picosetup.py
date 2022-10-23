@@ -1,6 +1,8 @@
 import sys
 import logging
 from selenium.webdriver.common.by import By
+
+from functions.driverfns import open_url
 from functions.fns import get_file_logger, get_syslogger
 from picoconstants import *
 from concurrent.futures import ThreadPoolExecutor
@@ -64,7 +66,7 @@ class SetupPico:
         self.accept_cookies()
         if not device_no == 0:
             self.driver.switch_to.new_window(type_hint='tab')
-        self.driver.get(LOGIN_URL)
+        open_url(LOGIN_URL, '_self', self.driver)
         self.driver.find_element(By.ID, EMAIL_FIELD_ID).send_keys(email)
         self.driver.find_element(By.ID, PASSWD_FIELD_ID).send_keys(pwd)
         if device_no == 0:

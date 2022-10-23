@@ -32,7 +32,7 @@ def __database_ok():
         cols = {
             "email": "Varchar(255)",
             "password": "Varchar(255)",
-            "device": "int(2)"
+            "device": "int(2)",
         }
         db_handler.create_tb('accounts', cols, 'email')
 

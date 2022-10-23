@@ -727,7 +727,7 @@ class AdData(MineBase):
         # Ad site has not opened, open it in a new tab.
         logger.info("Opening ad site url in a new tab.")
         from functions.driverfns import open_url
-        open_url(url=self.url, driver=self.driver)
+        open_url(self.url, '_blank', self.driver)
         time.sleep(25)
         self.switch_to_ad_tab()
 

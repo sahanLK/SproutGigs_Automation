@@ -1,6 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
 from typing import Union
-
 from selenium import webdriver
 from selenium.common import UnexpectedAlertPresentException, WebDriverException, NoSuchWindowException
 from functions.fns import get_from_db
@@ -24,18 +22,25 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 
-def open_url(url, driver: webdriver = None, target='_blank'):
+def open_url(url: str, target: str, driver: Union[webdriver.Chrome, webdriver.Edge] = None) -> None:
     """
     Opens a given url with a given webdriver.
-    :param driver: Selenium Webdriver
     :param url: str url to be opened.
     :param target: str _self or _blank in html.
+    :param driver: Selenium Webdriver instance
     :return:
     """
+    allowed_targets = ['_self', '_blank']
+    if target not in allowed_targets:
+        logger.critical(f"Invalid target parameter was passed in: {target}. Not opening: {url}")
+        return
     if not driver:
         driver = LiveControls.driver
     try:
-        driver.execute_script('''window.open("{}", "{}");'''.format(url, target))
+        if target == '_blank':
+            driver.switch_to.new_window(type_hint='tab')
+        driver.execute_cdp_cmd()
+        driver.execute_script('''window.open("{}");'''.format(url))
     except Exception as e:
         logger.error(f'Error opening link : {url}: {e}')
 
@@ -45,7 +50,7 @@ def filter_mt():
     Filter jobs for marketing test.
     :return: None
     """
-    open_url(url=MARKETING_TEST_URL, target="_self")
+    open_url(MARKETING_TEST_URL, "_self")
     logger.debug("Filtered for Marketing test jobs")
 
 
@@ -74,7 +79,7 @@ def snap_history():
         if LiveControls.stop_link_open:
             logger.debug("Stopped snapshot:\tOpened: {}".format(opened))
             break
-        open_url(link)
+        open_url(link, '_blank')
         opened += 1
         if TabsHandler.switch_to_tab_by_url(link):
             TabsHandler.close_active_tab()
