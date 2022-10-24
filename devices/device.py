@@ -3,14 +3,12 @@ import json
 import logging
 import os.path
 from subprocess import CREATE_NO_WINDOW
-from typing import Union
 
 from selenium import webdriver
 import pathlib
 from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.chrome.service import Service as ChromeService
 from functions.fns import get_file_logger, get_syslogger
-from livecontrols import LiveControls
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 
@@ -18,7 +16,7 @@ logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/device.log",
 sys_logger = get_syslogger()
 
 
-class _BaseDevice:
+class Edge(webdriver.Edge):
     """
     Create the Device
     """
@@ -29,11 +27,11 @@ class _BaseDevice:
     common_options = ['--no-sandbox', '--start-maximized',
                       '--disable-blink-features=AutomationControlled', 'disable-infobars']
 
-    def __init__(self, device_no: int):
+    def __init__(self, device_no: int, options, services, executable_path):
+        super(Edge, self).__init__(options=options, service=services, executable_path=executable_path)
         self.device_no = device_no
 
         self.configOk = False
-        self.driver = None
         # If the device number is 0, nothing special will happen,
         # Device 0 is a normal selenium webdriver instance without any modification except
         # the javascript -> navigator.webdriver is set to false.
@@ -128,37 +126,37 @@ class _BaseDevice:
         (function(platform, screenWidth, screenAvailWidth, windowOuterWidth, windowInnerWidth,
         screenHeight, screenAvailHeight, windowOuterHeight, windowInnerHeight,screenColorDepth,
          screenPixelDepth, navigatorUserAgent,navigatorCookieEnabled, navigatorDeviceMemory) {
-        
+
         console.log("Executing device configuration");
-    
+
         /* Width properties */
         Object.defineProperty(window.screen, 'width', {value: screenWidth});
         Object.defineProperty(window.screen, 'availWidth', {value: screenAvailWidth});
-        
+
         Object.defineProperty(window, 'outerWidth', {value: windowOuterWidth});
         Object.defineProperty(window, 'innerWidth', {value: windowInnerWidth});
 
         /* Height properties */
         Object.defineProperty(window.screen, 'height', {value: screenHeight});
         Object.defineProperty(window.screen, 'availHeight', {value: screenAvailHeight});
-        
+
         Object.defineProperty(window, 'outerHeight', {value: windowOuterHeight});
         Object.defineProperty(window, 'innerHeight', {value: windowInnerHeight});
-        
+
         /* Other windows.screen properties */
         Object.defineProperty(window.screen, 'colorDepth', {value: screenColorDepth});
         Object.defineProperty(window.screen, 'pixelDepth', {value: screenPixelDepth});
-        
+
         /* Other navigator properties */
         Object.defineProperty(window.navigator, 'platform', {value: platform});
         Object.defineProperty(window.navigator, 'cookieEnabled', {value: navigatorCookieEnabled});
         Object.defineProperty(window.navigator, 'deviceMemory', {value: navigatorDeviceMemory});
-        
+
         /* Spoofing navigator.userAgentData object */
         var userAgentDataClone = Object;
         Object.assign(userAgentDataClone, JSON.parse(JSON.stringify(window.navigator.userAgentData)));
         userAgentDataClone.platform = platform;
-    
+
         Object.defineProperty( window.navigator, 'userAgentData', {
             value: userAgentDataClone,
             writable: true,
@@ -183,7 +181,7 @@ class _BaseDevice:
                self.navigatorDeviceMemory)
 
         try:
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': script})
+            self.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': script})
             logger.info(f"Successfully executed cdp spoofing js")
             return True
         except Exception as e:
@@ -255,7 +253,7 @@ class _BaseDevice:
             file = os.path.abspath(f"{base_dir}/devices/configs.html")
             if not os.path.isfile(file):
                 raise FileNotFoundError
-            self.driver.get(f"file://{file}")
+            self.get(f"file://{file}")
             logger.info("Html file loaded")
 
             # Try to execute javascript for checking the settings really applied or
@@ -265,19 +263,12 @@ class _BaseDevice:
         except Exception as e:
             logger.error(f"Html file loading error: {e}")
 
-    def _load_actual_configs(self):
-        """
-        Display the actual configuration of the browser or device.
-        :return:
-        """
-        self.driver.execute_script(open("src/display-actual-configs.js").read())
-
     def _compare_configs(self):
         """
         Check al the actual values and configured values are equal or not.
         :return:
         """
-        if self.driver.execute_script(open('src/compare-configs.js').read()):
+        if self.execute_script(open('src/mark-misconfigs.js').read()):
             return True
 
     def open_url(self, url: str, target: str) -> None:
@@ -288,19 +279,18 @@ class _BaseDevice:
 
         try:
             if target == '_blank':
-                self.driver.switch_to.new_window(type_hint='tab')
+                self.switch_to.new_window(type_hint='tab')
             self.__execute_spoofing_cdp_js()
             self._load_config_page()
-            self._load_actual_configs()
             if self._compare_configs():
-                self.driver.get(url)
+                self.get(url)
             else:
                 sys_logger.critical(f"Configuration mismatch. Not opening {url}")
         except Exception as e:
             logger.error(f'Error opening link : {url}: {e}')
 
 
-class DeviceWithEdge(_BaseDevice):
+class DeviceWithEdge(Edge):
     def __init__(self, device_no: int, udd: str = None, pd: str = None):
         """
         Get a device with microsoft edge browser
@@ -359,9 +349,10 @@ class DeviceWithEdge(_BaseDevice):
             options = webdriver.EdgeOptions()
             options = self.__apply_edge_udd_and_pd(options=options)
             options.add_argument('--disable-blink-features=AutomationControlled')
-            self.driver = webdriver.Edge(
-                options=options,
-                executable_path='msedgedriver.exe')
+            self.driver = Edge(device_no=self.device_no,
+                               options=options,
+                               services=None,
+                               executable_path='msedgedriver.exe')
             return self.driver
 
         if not self.configOk:
@@ -369,10 +360,10 @@ class DeviceWithEdge(_BaseDevice):
             return
         logger.info("Configurations ok.")
 
-        self.driver = webdriver.Edge(
-            options=self.options,
-            service=self.service,
-            executable_path='msedgedriver.exe')
+        self.driver = Edge(device_no=self.device_no,
+                           options=self.options,
+                           services=self.service,
+                           executable_path='msedgedriver.exe')
         logger.info("Executing Spoofing CDP js")
         self.__execute_spoofing_cdp_js()
 
@@ -383,65 +374,3 @@ class DeviceWithEdge(_BaseDevice):
         return self.driver
 
 
-class DeviceWithChrome(_BaseDevice):
-    def __init__(self, device_no: int, udd: str):
-        """
-        :param device_no:
-        :param udd: User Data Directory
-        """
-        super(DeviceWithChrome, self).__init__(device_no=device_no)
-        # Don't need to do anything if configuration is not ok.
-        if self.configOk:
-            self.udd = udd
-
-            self.options = webdriver.ChromeOptions()
-            self.service = ChromeService()
-
-            self.service.creationflags = CREATE_NO_WINDOW
-            self.apply_common_options()
-
-    def apply_common_options(self):
-        for option in self.common_options:
-            self.options.add_argument(option)
-            logger.info(f'Option applied -> [{option}]')
-
-        self.options.add_experimental_option('prefs', {'intl.accept_languages': self.language})
-        self.options.add_experimental_option('useAutomationExtension', False)
-        self.options.add_experimental_option("excludeSwitches", ["enable-automation"])
-
-        prefs = {'disk-cache-size': 1073741824}
-        self.options.add_experimental_option('prefs', prefs)
-
-        if not os.path.exists(self.udd):
-            os.makedirs(self.udd)
-        self.options.add_argument(f"--user-data-dir={self.udd}")
-
-    def get_driver(self):
-        if not self.configOk:
-            print("Configuration error, Not returning driver.")
-            return
-
-        self.driver = webdriver.Chrome(
-            options=self.options,
-            service=self.service,
-            executable_path='msedgedriver.exe')
-        logger.info("Executing Spoofing CDP js")
-        self.__execute_spoofing_cdp_js()
-
-        if not self._generate_html():
-            return
-        if not self._load_config_page():
-            return
-        return self.driver
-
-
-if __name__ == "__main__":
-    device = DeviceWithEdge(device_no=1)
-    driver = device.get_driver()
-
-    for _ in range(5):
-        device.open_url(f"https://google.com", "_blank")
-
-
-    input()
-    driver.quit()

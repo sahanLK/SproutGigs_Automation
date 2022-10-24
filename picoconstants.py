@@ -30,9 +30,12 @@ PICO_LOCATION = os.path.join(os.environ['USERPROFILE'], 'Documents', 'Browser Pr
 """
 LOGIN PAGE CONSTANTS
 """
+
+# Home Url
+DOMAIN = 'sproutgigs'
+
 # Login Url
 LOGIN_URL = 'https://sproutgigs.com/login.php'
-# LOGIN_URL = 'https://account.google.com'
 
 # Cookie Accept Button X_PATH at the login page.
 COOKIE_ACC_BUT_X_PATH = '/html/body/div[3]/div/div/a'

@@ -121,7 +121,7 @@ def snap_history():
         logger.error('Could not detect proper history url type')
         return
 
-    driver.get(history_url)
+    driver.get()
     try:
         driver.save_screenshot(SNAPSHOT_LOC)
         TabsHandler.close_active_tab()
