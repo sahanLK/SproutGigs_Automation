@@ -1,27 +1,25 @@
+
 {
   "browser": {
     "name": null,
-    "appCodeName": "",
-    "userAgent": "",
-    "version": "",
-    "cookies": true,
-    "flash": false,
+    "navigatorUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+    "version": "106.0.0.0",
     "webGL": true
   },
   "device": {
     "platform": "MacIntel",
-    "screenWidth": 1280,
-    "screenHeight": 720,
-    "innerWidth": 50,
-    "innerHeight": 100,
-    "availWidth": 0,
-    "availHeight": 0,
-    "screenColorDepth": 0,
-    "screenPixelDepth": 0,
-    "memory": 12,
-    "gpu": null,
-    "batteryCharging": true,
-    "batteryLevel": 40,
-    "language": "en-us"
+    "screenWidth": 896,
+    "screenAvailWidth": 896,
+    "windowOuterWidth": 896,
+    "windowInnerWidth": 896,
+    "screenHeight": 808,
+    "screenAvailHeight": 808,
+    "windowOuterHeight": 808,
+    "windowInnerHeight": 666,
+    "screenColorDepth": 24,
+    "screenPixelDepth": 24,
+    "navigatorDeviceMemory": 12,
+    "language": "en-us",
+    "gpu": null
   }
 }

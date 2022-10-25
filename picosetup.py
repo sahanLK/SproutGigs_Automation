@@ -44,17 +44,21 @@ class SetupPico:
         email, pwd, browser = args[0], args[1], args[2]
         LiveControls.browser = browser  # Will be useful when capturing screenshots.
 
-        # Calculate the proper device no here according to the email and selected
-        # device at account creation.
-        device_no = 0  # Because devices are under development
+        device_record = db_handler.select_filtered('accounts', ['device'], f'email="{email}"')
+        if device_record:
+            device_no = device_record[0][0]
+            logger.debug(f"Device No: {device_no}")
+        else:
+            sys_logger.critical("Device number could not be taken from database")
+            return
 
-        if browser == 'chrome':
-            user_data_dir = os.path.join(PICO_LOCATION, email)
-            dev = device.DeviceWithChrome(device_no=device_no, udd=user_data_dir)
-            self.driver = dev.get_driver()
-            LiveControls.driver = self.driver
-        elif browser == 'edge':
-            dev = device.DeviceWithEdge(device_no=device_no, udd=PICO_LOCATION, pd=email)
+        # if browser == 'chrome':
+        #     user_data_dir = os.path.join(PICO_LOCATION, email)
+        #     dev = device.DeviceWithChrome(device_no=device_no, udd=user_data_dir)
+        #     self.driver = dev.get_driver()
+        #     LiveControls.driver = self.driver
+        if browser == 'edge':
+            dev = device.DeviceWithEdge(device_no=device_no, pd=email)
             self.driver = dev.get_driver()
             LiveControls.driver = self.driver
         else:

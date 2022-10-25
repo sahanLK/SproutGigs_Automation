@@ -1,37 +1,105 @@
-# Creates the given device with related json data
+# Programmed only for Microsoft Edge driver
 import json
-import logging
-import os.path
-from subprocess import CREATE_NO_WINDOW
-
-from selenium import webdriver
+import os
 import pathlib
+import logging
+from typing import Union
+from bs4 import BeautifulSoup
+from subprocess import CREATE_NO_WINDOW
+from selenium import webdriver
+from functions.fns import get_file_logger
+from selenium.webdriver.remote.command import Command
 from selenium.webdriver.edge.service import Service as EdgeService
-from selenium.webdriver.chrome.service import Service as ChromeService
-from functions.fns import get_file_logger, get_syslogger
+from selenium.webdriver.edge.options import Options as EdgeOptions
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
-
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/device.log", 'w+')
-sys_logger = get_syslogger()
 
 
 class Edge(webdriver.Edge):
-    """
-    Create the Device
-    """
 
-    """
-    Common options
-    """
+    def __init__(self, device_no: int, pd: Union[str, None]):
+        # Configuration object that handles all the configurations.
+        self.configs = _Configs(device_no=device_no, pd=pd)
+        if not self.configs.configOk:
+            logger.critical("Configuration error. Not initializing webdriver")
+            return
+
+        if not self.configs.htmlGenerated:
+            logger.critical("Html file generate error. Not initializing webdriver")
+            return
+
+        options = self.configs.options
+        if not self.configs.optionReady:
+            logger.critical("Options are not ready. Not initializing webdriver")
+            return
+
+        service = self.configs.service
+        if not self.configs.serviceReady:
+            logger.critical("Services are not ready. Not initializing webdriver")
+            return
+
+        # Looking Good. Initialize the webdriver.
+        logger.debug("All Good. Initializing Edge")
+        super(Edge, self).__init__(options=options, service=service)
+        # If WebDriverException error exists after initializing webdriver, it maybe because of
+        # previous webdriver session uses the UDD and PD already. So, close previous driver sessions
+        # and processes
+
+    def __repr__(self):
+        """
+        When __init__ method did not execute the parent initialization (super) because of return
+        statements in the __init__, this class becomes not representable or printable and generates errors.
+        To prevent those errors, keep this always here.
+        Errors are prevented by putting a fake session_id as 0.
+        :return:
+        """
+        try:
+            # Instance has created properly
+            return '<{0.__module__}.{0.__name__} (session="{1}")>'.format(
+                type(self), self.session_id)
+        except AttributeError:
+            return "0"
+
+    def get(self, url: str) -> None:
+        logger.debug("Method <get> is out of service. Use <open_url> instead.")
+        return
+
+    def open_url(self, url: str, target: str) -> None:
+        if target == "_blank":
+            try:
+                self.switch_to.new_window(type_hint='tab')
+            except Exception as e:
+                logger.debug(f"Url open error: {e}")
+                return
+
+        if 'sproutgigs' in url:  # Spoof for sproutgigs.com
+            logger.debug(f"SproutGigs url opening: {url}")
+            self.configs.exec_spoof_js(self)
+            if self.configs.load_config_page(self):
+                if self.configs.is_config_equal(self):
+                    self.execute(Command.GET, {'url': url})
+                else:
+                    logger.critical(f"Configuration mismatch found. Not opening: {url}")
+        else:
+            logger.debug(f"Url: {url} is not a SproutGigs url. Opening without any spoofing protocol")
+            self.execute(Command.GET, {'url': url})
+
+
+class _Configs:
     common_options = ['--no-sandbox', '--start-maximized',
                       '--disable-blink-features=AutomationControlled', 'disable-infobars']
 
-    def __init__(self, device_no: int, options, services, executable_path):
-        super(Edge, self).__init__(options=options, service=services, executable_path=executable_path)
-        self.device_no = device_no
+    def __init__(self, device_no: int, pd: Union[str, None]):
+        self.device_no = device_no  # No. of the Json file
+        self.pd = pd    # Profile Directory
 
+        # Do not initialize the webdriver is any of one below is False
         self.configOk = False
+        self.htmlGenerated = False
+        self.optionReady = False
+        self.serviceReady = False
+
         # If the device number is 0, nothing special will happen,
         # Device 0 is a normal selenium webdriver instance without any modification except
         # the javascript -> navigator.webdriver is set to false.
@@ -54,9 +122,7 @@ class Edge(webdriver.Edge):
         # self.browserName = self.browserInfo['name']     # Possible values: [chrome, firefox, edge]
         # self.appCodeName = self.browserInfo['appCodeName']
         # self.browserVersion = self.browserInfo['version']
-
-        # self.flashEnabled = self.browserInfo['flash']
-        self.webGlEnabled = self.browserInfo['webGL']  # Option
+        self.webGlEnabled = self.browserInfo['webGL']
 
         # Device information
         self.platform = self.deviceInfo['platform']  # Multiple JS
@@ -77,17 +143,13 @@ class Edge(webdriver.Edge):
         self.screenPixelDepth = self.deviceInfo['screenPixelDepth']  # JS
 
         self.navigatorUserAgent = self.browserInfo['navigatorUserAgent']  # JS
-        self.navigatorCookieEnabled = self.browserInfo['navigatorCookies']  # JS
         self.navigatorDeviceMemory = self.deviceInfo['navigatorDeviceMemory']  # JS
 
         self.language = self.deviceInfo['language']  # Experimental Option
         self.gpu = self.deviceInfo['gpu']  # Option
 
         self._chk_req_configs()
-        if self.configOk:
-            self.store_common_options()
-        else:
-            logger.error("Configuration error")
+        self.generate_html()
 
     def _chk_req_configs(self):
         # Check browser configs
@@ -109,86 +171,7 @@ class Edge(webdriver.Edge):
                 logger.info(f"Device Config for <{key}> set")
         self.configOk = True
 
-    def store_common_options(self):
-        """
-        The options that require prior modification or checking, are appended into
-        [common_options] with this method.
-        :return:
-        """
-        if not self.gpu:
-            self.common_options.append("--disable-gpu")  # Change the canvas fingerprint
-        if not self.webGlEnabled:
-            self.common_options.append("--disable-webgl")  # Disabling WebGl
-        self.common_options.append(f'--user-agent={self.navigatorUserAgent}')
-
-    def __execute_spoofing_cdp_js(self) -> bool:
-        script = """
-        (function(platform, screenWidth, screenAvailWidth, windowOuterWidth, windowInnerWidth,
-        screenHeight, screenAvailHeight, windowOuterHeight, windowInnerHeight,screenColorDepth,
-         screenPixelDepth, navigatorUserAgent,navigatorCookieEnabled, navigatorDeviceMemory) {
-
-        console.log("Executing device configuration");
-
-        /* Width properties */
-        Object.defineProperty(window.screen, 'width', {value: screenWidth});
-        Object.defineProperty(window.screen, 'availWidth', {value: screenAvailWidth});
-
-        Object.defineProperty(window, 'outerWidth', {value: windowOuterWidth});
-        Object.defineProperty(window, 'innerWidth', {value: windowInnerWidth});
-
-        /* Height properties */
-        Object.defineProperty(window.screen, 'height', {value: screenHeight});
-        Object.defineProperty(window.screen, 'availHeight', {value: screenAvailHeight});
-
-        Object.defineProperty(window, 'outerHeight', {value: windowOuterHeight});
-        Object.defineProperty(window, 'innerHeight', {value: windowInnerHeight});
-
-        /* Other windows.screen properties */
-        Object.defineProperty(window.screen, 'colorDepth', {value: screenColorDepth});
-        Object.defineProperty(window.screen, 'pixelDepth', {value: screenPixelDepth});
-
-        /* Other navigator properties */
-        Object.defineProperty(window.navigator, 'platform', {value: platform});
-        Object.defineProperty(window.navigator, 'cookieEnabled', {value: navigatorCookieEnabled});
-        Object.defineProperty(window.navigator, 'deviceMemory', {value: navigatorDeviceMemory});
-
-        /* Spoofing navigator.userAgentData object */
-        var userAgentDataClone = Object;
-        Object.assign(userAgentDataClone, JSON.parse(JSON.stringify(window.navigator.userAgentData)));
-        userAgentDataClone.platform = platform;
-
-        Object.defineProperty( window.navigator, 'userAgentData', {
-            value: userAgentDataClone,
-            writable: true,
-            enumerable: true,
-            configurable: true,
-        });
-        console.log("Executed device configuration successfully");
-        })("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s")
-        """ % (self.platform,
-               self.screenWidth,
-               self.screenAvailWidth,
-               self.windowOuterWidth,
-               self.windowInnerWidth,
-               self.screenHeight,
-               self.screenAvailHeight,
-               self.windowOuterHeight,
-               self.windowInnerHeight,
-               self.screenColorDepth,
-               self.screenPixelDepth,
-               self.navigatorUserAgent,
-               self.navigatorCookieEnabled,
-               self.navigatorDeviceMemory)
-
-        try:
-            self.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': script})
-            logger.info(f"Successfully executed cdp spoofing js")
-            return True
-        except Exception as e:
-            logger.error(f"Error when executing cdp js: {e}")
-        return False
-
-    def _generate_html(self):
+    def generate_html(self):
         header = open(f'{base_dir}/devices/config-page/header.txt').read()
         footer = open(f'{base_dir}/devices/config-page/footer.txt').read()
         logger.info("Page header and footer ready.")
@@ -206,171 +189,224 @@ class Edge(webdriver.Edge):
             {'property': 'screen.colorDepth', 'value': self.screenColorDepth, 'id': 'colordepth'},
             {'property': 'screen.pixelDepth', 'value': self.screenPixelDepth, 'id': 'pixeldepth'},
             {'property': 'navigator.userAgent', 'value': self.navigatorUserAgent, 'id': 'useragent'},
-            {'property': 'navigator.cookieEnabled', 'value': self.navigatorCookieEnabled, 'id': 'cookieenabled'},
             {'property': 'navigator.deviceMemory', 'value': self.navigatorDeviceMemory, 'id': 'devicememory'},
         ]
 
         tb_rows = ''
         for setting in all_settings:
-            tb_rows += f"<tr>\n" \
-                       f"\t<td>{setting['property']}</td>\n" \
-                       f"\t<td>{setting['value']}</td>\n" \
-                       f"\t<td id='{setting['id']}'></td>\n" \
+            tb_rows += f"<tr id='config-row'>\n" \
+                       f"\t<td class='property'>{setting['property']}</td>\n" \
+                       f"\t<td class='configured'>{setting['value']}</td>\n" \
+                       f"\t<td class='actual' id='{setting['id']}'></td>\n" \
                        f"</tr>\n"
 
         body = f"""
-        <div class="intro">
-            <h2 class="text-center device-no">Javascript Configuration For Device {self.device_no}</h2>
-        </div>
-        <div class="content">
-            <table class="table table-striped table-bordered">
-                <thead class="thead-dark">
-                    <tr><th scope="col">Property</th>
-                        <th scope="col">Configured To:</th>
-                        <th scope="col">Actual</th>
-                    </tr>
-                </thead>
-                {tb_rows}
-            </table>
-        </div>
-        """
+                <div class="intro">
+                    <h2 class="text-center device-no">Javascript Configuration For Device {self.device_no}</h2>
+                </div>
+                <div class="content">
+                    <table class="table table-striped table-bordered" id="config-table">
+                        <thead class="thead-dark">
+                            <tr><th scope="col">Property</th>
+                                <th scope="col">Configured To:</th>
+                                <th scope="col">Actual</th>
+                            </tr>
+                        </thead>
+                        {tb_rows}
+                    </table>
+                </div>
+                """
         try:
             with open(f'{base_dir}/devices/configs.html', 'w+') as f:
                 f.write("{}\n{}\n{}".format(header, body, footer))
-                logger.info("Generated configuration html file")
+                logger.debug("Generated configuration html file")
+                self.htmlGenerated = True
                 return True
         except Exception as e:
-            logger.error(f"Configuration html file generate error: {e}")
+            logger.critical(f"Failed to generate configuration html file: {e}")
         # footer.txt file also contains some js code to display browser actual settings.
 
-    def _load_config_page(self):
+    def exec_spoof_js(self, driver: Union[Edge]):
+        script = """
+                (function(platform, screenWidth, screenAvailWidth, windowOuterWidth, windowInnerWidth,
+                screenHeight, screenAvailHeight, windowOuterHeight, windowInnerHeight,screenColorDepth,
+                 screenPixelDepth, navigatorUserAgent, navigatorDeviceMemory) {
+
+                console.log("Executing device configuration");
+
+                /* Width properties */
+                Object.defineProperty(window.screen, 'width', {value: screenWidth});
+                Object.defineProperty(window.screen, 'availWidth', {value: screenAvailWidth});
+
+                Object.defineProperty(window, 'outerWidth', {value: windowOuterWidth});
+                Object.defineProperty(window, 'innerWidth', {value: windowInnerWidth});
+
+                /* Height properties */
+                Object.defineProperty(window.screen, 'height', {value: screenHeight});
+                Object.defineProperty(window.screen, 'availHeight', {value: screenAvailHeight});
+
+                Object.defineProperty(window, 'outerHeight', {value: windowOuterHeight});
+                Object.defineProperty(window, 'innerHeight', {value: windowInnerHeight});
+
+                /* Other windows.screen properties */
+                Object.defineProperty(window.screen, 'colorDepth', {value: screenColorDepth});
+                Object.defineProperty(window.screen, 'pixelDepth', {value: screenPixelDepth});
+
+                /* Other navigator properties */
+                Object.defineProperty(window.navigator, 'platform', {value: platform});
+                Object.defineProperty(window.navigator, 'deviceMemory', {value: navigatorDeviceMemory});
+
+                /* Spoofing navigator.userAgentData object */
+                var userAgentDataClone = Object;
+                Object.assign(userAgentDataClone, JSON.parse(JSON.stringify(window.navigator.userAgentData)));
+                userAgentDataClone.platform = platform;
+
+                Object.defineProperty( window.navigator, 'userAgentData', {
+                    value: userAgentDataClone,
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                });
+                console.log("Executed device configuration successfully");
+                })("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s")
+                """ % (self.platform,
+                       self.screenWidth,
+                       self.screenAvailWidth,
+                       self.windowOuterWidth,
+                       self.windowInnerWidth,
+                       self.screenHeight,
+                       self.screenAvailHeight,
+                       self.windowOuterHeight,
+                       self.windowInnerHeight,
+                       self.screenColorDepth,
+                       self.screenPixelDepth,
+                       self.navigatorUserAgent,
+                       self.navigatorDeviceMemory)
+
+        driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {'source': script})
+        logger.debug(f"CDP spoofing js executed. Since this doesn't give any output,"
+                     f" successful execution not guaranteed.")
+
+    @staticmethod
+    def load_config_page(driver: Union[Edge]):
         """
-        Loads the generated configs.html file into the current active tab.
+        Loads the generated html file into the browser.
+        :param driver:
         :return:
         """
-        logger.info("Loading html file")
         try:
             file = os.path.abspath(f"{base_dir}/devices/configs.html")
             if not os.path.isfile(file):
                 raise FileNotFoundError
-            self.get(f"file://{file}")
-            logger.info("Html file loaded")
-
-            # Try to execute javascript for checking the settings really applied or
+            # Do not use <open_url> method below. It will be an infinite loop
+            driver.execute(Command.GET, {'url': file})
+            logger.info("Configuration html file loaded")
             return True
         except FileNotFoundError:
-            logger.error("configs.html not found.")
+            logger.critical("configs.html not found.")
         except Exception as e:
-            logger.error(f"Html file loading error: {e}")
+            logger.critical(f"Html file loading error: {e}")
 
-    def _compare_configs(self):
+    @staticmethod
+    def is_config_equal(driver: Union[Edge]) -> bool:
         """
-        Check al the actual values and configured values are equal or not.
+        This is used to check if all the actual values and configured values are
+        equal or not. If any of them are not equal, do not open any url.
+        Use this method to check all the configurations whenever you are going to open an url.
+        :param driver:
         :return:
         """
-        if self.execute_script(open('src/mark-misconfigs.js').read()):
-            return True
+        html = driver.page_source
+        soup = BeautifulSoup(str(html), 'lxml')
 
-    def open_url(self, url: str, target: str) -> None:
-        allowed_targets = ['_self', '_blank']
-        if target not in allowed_targets:
-            logger.critical(f"Invalid target parameter was passed in: {target}. Not opening: {url}")
-            return
+        for tr in soup.find_all('tr', {'id': 'config-row'}):
+            config_to = tr.find('td', {'class': 'configured'}).text.strip()
+            actual = tr.find('td', {'class': 'actual'}).text.strip()
+            if config_to != actual:
+                logger.error(f"Configuration mismatch:\t[{config_to} != {actual}]")
+                return False
+        return True
 
-        try:
-            if target == '_blank':
-                self.switch_to.new_window(type_hint='tab')
-            self.__execute_spoofing_cdp_js()
-            self._load_config_page()
-            if self._compare_configs():
-                self.get(url)
-            else:
-                sys_logger.critical(f"Configuration mismatch. Not opening {url}")
-        except Exception as e:
-            logger.error(f'Error opening link : {url}: {e}')
+    @property
+    def options(self) -> EdgeOptions:
+        options = EdgeOptions()
 
+        # Update common_options with few other values based on json data
+        if not self.gpu:
+            self.common_options.append("--disable-gpu")  # Change the canvas fingerprint
+        if not self.webGlEnabled:
+            self.common_options.append("--disable-webgl")  # Disabling WebGl
+        self.common_options.append(f'--user-agent={self.navigatorUserAgent}')
 
-class DeviceWithEdge(Edge):
-    def __init__(self, device_no: int, udd: str = None, pd: str = None):
-        """
-        Get a device with microsoft edge browser
-        :param device_no: Used to identify the correct json file.
-        :param udd: User data directory
-        :param pd: Profile directory. Unique to the edge browser.
-        """
-        super(DeviceWithEdge, self).__init__(device_no=device_no)
-        self.udd = udd
-        self.pd = pd  # A unique option only for Microsoft Edge.
-
-        # Don't need to do anything if configuration is not ok.
-        if self.configOk:
-            self.options = webdriver.EdgeOptions()
-            self.service = EdgeService()
-
-            self.service.creationflags = CREATE_NO_WINDOW
-            self.apply_common_options()
-
-    def apply_common_options(self):
-        logger.info("Applying options.")
         for option in self.common_options:
-            self.options.add_argument(option)
-            logger.info(f'Option applied -> [{option}]')
+            options.add_argument(option)
+            logger.info(f"Option applied ->\t{option}")
 
-        self.options.add_experimental_option('prefs', {'intl.accept_languages': self.language})
-        self.options.add_experimental_option('useAutomationExtension', False)
-        self.options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # For device 0, common options will be applied
+        if self.device_no == 0:
+            return options
+
+        options.add_experimental_option('prefs', {'intl.accept_languages': self.language})
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
         # Browser specific options
-        self.options.use_chromium = True
-        self.options = self.__apply_edge_udd_and_pd(options=self.options)
+        options.use_chromium = True  # For edge only
 
-        # self.options.binary_location = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-        logger.info("Options applied.")
-
-    def __apply_edge_udd_and_pd(self, options: [webdriver.EdgeOptions]):
-        # Here you set the path of the profile ending with User Data not the profile folder
-        if self.udd:
-            if os.path.exists(self.udd):
-                options.add_argument(f"--user-data-dir={self.udd}")
-                logger.debug(f"UDD applied -> {self.udd}")
-            else:
-                logger.debug("UDD path not available")
+        # Here you set the UDD. Currently, program uses below hard coded UDD
+        udd = os.path.join(os.environ['USERPROFILE'], 'Documents', 'Browser Profiles')
+        if not os.path.exists(udd):
+            logger.debug("UDD path not available. Creating directories")
+            try:
+                os.makedirs(udd)
+            except Exception as e:
+                logger.critical(f"Error when creating UDD directories: {e}")
+                return options
+        options.add_argument(f"--user-data-dir={udd}")
+        logger.debug(f"UDD applied -> {udd}")
 
         # Here you specify the actual profile folder
         if self.pd:
             options.add_argument(f"profile-directory={self.pd}")
-            logger.debug(f"PD applied for MS Edge driver -> {self.pd}")
+            logger.debug(f"PD applied for Edge  -> {self.pd}")
+        else:
+            logger.debug("PD not given")
+            return options
+
+        self.optionReady = True     # Only set to True, if all the options are successfully applied.
+        logger.debug("All Options applied")
         return options
 
-    def get_driver(self):
-        logger.debug("Getting driver")
-        if self.device_no == 0:
-            logger.debug("Creating Device 0")
-            options = webdriver.EdgeOptions()
-            options = self.__apply_edge_udd_and_pd(options=options)
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            self.driver = Edge(device_no=self.device_no,
-                               options=options,
-                               services=None,
-                               executable_path='msedgedriver.exe')
-            return self.driver
-
-        if not self.configOk:
-            logger.error("Configuration error, Not returning driver.")
-            return
-        logger.info("Configurations ok.")
-
-        self.driver = Edge(device_no=self.device_no,
-                           options=self.options,
-                           services=self.service,
-                           executable_path='msedgedriver.exe')
-        logger.info("Executing Spoofing CDP js")
-        self.__execute_spoofing_cdp_js()
-
-        if not self._generate_html():
-            return
-        if not self._load_config_page():
-            return
-        return self.driver
+    @property
+    def service(self) -> EdgeService:
+        service = EdgeService()
+        service.creationflags = CREATE_NO_WINDOW
+        logger.debug("Services applied")
+        self.serviceReady = True
+        return service
 
 
+class DeviceWithEdge:
+    def __init__(self, device_no: int, pd: str = None):
+        self.device_no = device_no
+        self.pd = pd
+
+    def get_driver(self) -> Union[Edge, None]:
+        driver = Edge(device_no=self.device_no, pd=self.pd)
+        try:
+            # If this does not generate an error, driver is properly initialized.
+            session = driver.session_id
+            print(driver)
+            return driver
+        except AttributeError:
+            return None
+
+
+if __name__ == "__main__":
+    device = DeviceWithEdge(device_no=1, pd='test')
+    drv = device.get_driver()
+
+    if drv:
+        drv.open_url("http://sproutgigs.com", target="_self")
+        for _ in range(2):
+            drv.open_url("http://sproutgigs.com", target='_blank')

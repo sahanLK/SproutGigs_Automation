@@ -1,9 +1,9 @@
 {
   "browser": {
     "name": null,
-    "appCodeName": "",
-    "userAgent": "",
-    "version": "",
+    "appCodeName": "Mozilla",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+    "version": "106.0.0.0",
     "cookies": true,
     "flash": false,
     "webGL": true

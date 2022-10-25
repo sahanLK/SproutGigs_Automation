@@ -24,8 +24,6 @@ POSITION_X = pyautogui.size().width * (25 / 100)
 # Y-Coordinates of the browser position
 POSITION_Y = 0
 
-# PROGRAM LOCATION TO SAVE CHROME PROFILES AND ETC..
-PICO_LOCATION = os.path.join(os.environ['USERPROFILE'], 'Documents', 'Browser Profiles')
 
 """
 LOGIN PAGE CONSTANTS
