@@ -1,5 +1,4 @@
 from selenium.common import NoSuchWindowException
-
 from functions.fns import get_file_logger, get_syslogger
 from picoconstants import DOING_JOB_PAGE_INITIALS, MARKETING_TEST_URL
 from functions.driverfns import get_driver, get_current_url, switch_to_any_tab

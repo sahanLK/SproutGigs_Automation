@@ -20,7 +20,8 @@ class LiveControls:
     """
     Webdriver instance to be used across all over the programme.
     """
-    driver = None
+    from devices.device import Edge
+    driver: Edge = None
 
     """
     Type of web browser using for current session
@@ -44,6 +45,12 @@ class LiveControls:
     Must be cleared after job skip, submission or hide.
     """
     submission_widgets = {}
+
+    """
+    Whether user has clicked the run button or not.
+    This will be used to prevent selecting jobs before clicking the run button in main screen
+    """
+    jobs_running = False
 
     @classmethod
     def set_default(cls):

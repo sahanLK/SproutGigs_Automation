@@ -1,8 +1,6 @@
 import sys
 import logging
 from selenium.webdriver.common.by import By
-
-from functions.driverfns import open_url
 from functions.fns import get_file_logger, get_syslogger
 from picoconstants import *
 from concurrent.futures import ThreadPoolExecutor
@@ -47,7 +45,7 @@ class SetupPico:
         device_record = db_handler.select_filtered('accounts', ['device'], f'email="{email}"')
         if device_record:
             device_no = device_record[0][0]
-            logger.debug(f"Device No: {device_no}")
+            sys_logger.debug(f"Device No: {device_no}")
         else:
             sys_logger.critical("Device number could not be taken from database")
             return
@@ -68,13 +66,10 @@ class SetupPico:
         self.__adjust_window()
 
         self.accept_cookies()
-        if not device_no == 0:
-            self.driver.switch_to.new_window(type_hint='tab')
-        open_url(LOGIN_URL, '_self', self.driver)
+        self.driver.open_url(LOGIN_URL, '_self', force_chk_config=True)
         self.driver.find_element(By.ID, EMAIL_FIELD_ID).send_keys(email)
         self.driver.find_element(By.ID, PASSWD_FIELD_ID).send_keys(pwd)
-        if device_no == 0:
-            self.driver.find_element(By.XPATH, LOGIN_BUT_X_PATH).click()
+        self.driver.find_element(By.XPATH, LOGIN_BUT_X_PATH).click()
 
     def __adjust_window(self):
         self.driver.set_window_size(WINDOW_WIDTH, WINDOW_HEIGHT)

@@ -2,12 +2,12 @@
 {
   "browser": {
     "name": null,
-    "navigatorUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
+    "navigatorUserAgent": "\tMozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edg/106.0.1370.52",
     "version": "106.0.0.0",
     "webGL": true
   },
   "device": {
-    "platform": "MacIntel",
+    "platform": "Win32",
     "screenWidth": 1536,
     "screenAvailWidth": 1536,
     "windowOuterWidth": 1536,

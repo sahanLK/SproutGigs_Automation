@@ -5,7 +5,7 @@ import settings
 from datetime import datetime
 from ai import BooleanCheck
 from functions.fns import list_to_str, str_cleaner, get_file_logger, get_syslogger, get_ascii
-from functions.driverfns import open_url, filter_mt, get_driver, modify_doing_job_page
+from functions.driverfns import filter_mt, get_driver, modify_doing_job_page
 from livecontrols import LiveControls
 from picoconstants import DOING_JOB_PAGE_INITIALS, HIDE_JOB_CLSNAME
 from bs4 import BeautifulSoup
@@ -40,7 +40,6 @@ class JobsHandler(TabsHandler):
 
     def __init__(self):
         super(JobsHandler, self).__init__()
-
         self.driver = None
         self.actions = None
         self.current_job_id = None
@@ -67,7 +66,6 @@ class JobsHandler(TabsHandler):
         else:
             logger.error("Failed to update jobs")
         self.store_job_ids(job_ids)
-        logger.debug(f"Jobs Updated\t\t->\tStored: {len(job_ids)}\t\tSkipped: {skipped} jobs.")
         sys_logger.debug(f"Jobs Updated\t\t->\tStored: {len(job_ids)}\t\tSkipped: {skipped} jobs.")
 
     @classmethod
@@ -79,6 +77,10 @@ class JobsHandler(TabsHandler):
         Selects the job from the <jobs_pool> list, referring to the given index.
         :return: HTML source of the job page.
         """
+        if not LiveControls.jobs_running:
+            sys_logger.debug("Please click the run button in main screen before handling jobs.")
+            return
+
         self.skip_job()
         sys_logger.info("Selecting a new job")
         try:
@@ -91,7 +93,8 @@ class JobsHandler(TabsHandler):
             sys_logger.critical(f"Unexpected error while getting a Job ID: {e}")
 
         job_url = f'{DOING_JOB_PAGE_INITIALS}{self.current_job_id}'
-        open_url(job_url, '_blank')
+        driver = get_driver()
+        driver.open_url(job_url, target='_blank', force_chk_config=False)
 
         # If the current job has expired, select another job
         if not self.go_to_doing_job_tab():
@@ -137,7 +140,8 @@ class JobsHandler(TabsHandler):
         links_http.update(links_no_http)
         sys_logger.debug(f"Total links from ji_section: {len(links_http)}")
         for url in links_http:
-            open_url(url, '_blank')
+            driver = get_driver()
+            driver.open_url(url, target="_blank")
 
     def __get_job_page_source(self):
         try:
@@ -160,7 +164,7 @@ class JobsHandler(TabsHandler):
         job_data_saver = _JobDataSaver(str(page_source))
         ji_section = job_data_saver.get_ji_section()
         ap_section = job_data_saver.get_ap_section()
-        # job_data_saver.store_submission_fields()
+        job_data_saver.store_submission_fields()
 
         try:
             db_handler.clear_tb('current_job_data')
@@ -187,9 +191,12 @@ class JobsHandler(TabsHandler):
         Ps.clear_cache()
         LiveControls.set_default()
 
-        # Clear all url input field
-        LiveControls.screens['main_screen'].input_url.clear()
         self.clear_submission_widgets()
+
+        wh = MainScreenWidgetsHandler()
+        wh.clear_blog_url_field()  # Clear all url input field
+        wh.but_miner_submit_set_default()
+        wh.but_miner_submit_set_default()
         logger.info("Job skipped.")
         sys_logger.info("Job skipped\n\n")
 

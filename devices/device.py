@@ -65,25 +65,45 @@ class Edge(webdriver.Edge):
         logger.debug("Method <get> is out of service. Use <open_url> instead.")
         return
 
-    def open_url(self, url: str, target: str) -> None:
-        if target == "_blank":
-            try:
-                self.switch_to.new_window(type_hint='tab')
-            except Exception as e:
-                logger.debug(f"Url open error: {e}")
+    @staticmethod
+    def is_sprout_link(url: str):
+        if 'sproutgigs' in url.lower():
+            return True
+
+    def open_url(self, url: str, target: str, force_chk_config: bool = True) -> None:
+        # If url is not a sproutgigs.com url
+        if not self.is_sprout_link(url):
+            self.execute_script("""window.open("{}", "{}")""".format(url, target))
+            return
+
+        if self.is_sprout_link(url):
+            logger.debug(f"SproutGigs url opening: {url}")
+            if target == "_blank":
+                # Open a new tab with JS and switch to that new tab.
+                # Do not open the tab with selenium because, the tab won't be able to close with JS.
+                try:
+                    blank_url = 'about:blank'
+                    self.execute_script(f"window.open('{blank_url}');")
+                    from tabshandler import TabsHandler
+                    if not TabsHandler.switch_to_tab_by_url(blank_url):
+                        logger.critical("Error when switching to empty tab with TabsHandler")
+                        return
+                except Exception as e:
+                    logger.debug(f"Url open error: {e}")
+                    return
+
+            self.configs.exec_spoof_js(self)
+            # Get the url
+            if not force_chk_config:
+                self.execute(Command.GET, {'url': url})
                 return
 
-        if 'sproutgigs' in url:  # Spoof for sproutgigs.com
-            logger.debug(f"SproutGigs url opening: {url}")
-            self.configs.exec_spoof_js(self)
             if self.configs.load_config_page(self):
                 if self.configs.is_config_equal(self):
                     self.execute(Command.GET, {'url': url})
+                    return
                 else:
                     logger.critical(f"Configuration mismatch found. Not opening: {url}")
-        else:
-            logger.debug(f"Url: {url} is not a SproutGigs url. Opening without any spoofing protocol")
-            self.execute(Command.GET, {'url': url})
 
 
 class _Configs:
@@ -235,26 +255,26 @@ class _Configs:
                 console.log("Executing device configuration");
 
                 /* Width properties */
-                Object.defineProperty(window.screen, 'width', {value: screenWidth});
-                Object.defineProperty(window.screen, 'availWidth', {value: screenAvailWidth});
+                Object.defineProperty(window.screen, 'width', {value: Number(screenWidth)});
+                Object.defineProperty(window.screen, 'availWidth', {value: Number(screenAvailWidth)});
 
-                Object.defineProperty(window, 'outerWidth', {value: windowOuterWidth});
-                Object.defineProperty(window, 'innerWidth', {value: windowInnerWidth});
+                Object.defineProperty(window, 'outerWidth', {value: Number(windowOuterWidth)});
+                Object.defineProperty(window, 'innerWidth', {value: Number(windowInnerWidth)});
 
                 /* Height properties */
-                Object.defineProperty(window.screen, 'height', {value: screenHeight});
-                Object.defineProperty(window.screen, 'availHeight', {value: screenAvailHeight});
+                Object.defineProperty(window.screen, 'height', {value: Number(screenHeight)});
+                Object.defineProperty(window.screen, 'availHeight', {value: Number(screenAvailHeight)});
 
-                Object.defineProperty(window, 'outerHeight', {value: windowOuterHeight});
-                Object.defineProperty(window, 'innerHeight', {value: windowInnerHeight});
+                Object.defineProperty(window, 'outerHeight', {value: Number(windowOuterHeight)});
+                Object.defineProperty(window, 'innerHeight', {value: Number(windowInnerHeight)});
 
                 /* Other windows.screen properties */
-                Object.defineProperty(window.screen, 'colorDepth', {value: screenColorDepth});
-                Object.defineProperty(window.screen, 'pixelDepth', {value: screenPixelDepth});
+                Object.defineProperty(window.screen, 'colorDepth', {value: Number(screenColorDepth)});
+                Object.defineProperty(window.screen, 'pixelDepth', {value: Number(screenPixelDepth)});
 
                 /* Other navigator properties */
                 Object.defineProperty(window.navigator, 'platform', {value: platform});
-                Object.defineProperty(window.navigator, 'deviceMemory', {value: navigatorDeviceMemory});
+                Object.defineProperty(window.navigator, 'deviceMemory', {value: Number(navigatorDeviceMemory)});
 
                 /* Spoofing navigator.userAgentData object */
                 var userAgentDataClone = Object;
@@ -402,11 +422,11 @@ class DeviceWithEdge:
             return None
 
 
-if __name__ == "__main__":
-    device = DeviceWithEdge(device_no=1, pd='test')
-    drv = device.get_driver()
-
-    if drv:
-        drv.open_url("http://sproutgigs.com", target="_self")
-        for _ in range(2):
-            drv.open_url("http://sproutgigs.com", target='_blank')
+# if __name__ == "__main__":
+    # device = DeviceWithEdge(device_no=1, pd='test')
+    # drv = device.get_driver()
+    #
+    # if drv:
+    #     drv.open_url("http://sproutgigs.com", target="_self")
+    #     for _ in range(2):
+    #         drv.open_url("http://sproutgigs.com", target='_blank')

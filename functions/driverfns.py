@@ -1,6 +1,8 @@
 from typing import Union
 from selenium import webdriver
 from selenium.common import UnexpectedAlertPresentException, WebDriverException, NoSuchWindowException
+
+from devices.device import Edge
 from functions.fns import get_from_db
 from picoconstants import (MARKETING_TEST_URL,
                            CHROME_HISTORY_URL,
@@ -39,7 +41,6 @@ def open_url(url: str, target: str, driver: Union[webdriver.Chrome, webdriver.Ed
     try:
         if target == '_blank':
             driver.switch_to.new_window(type_hint='tab')
-        driver.execute_cdp_cmd()
         driver.execute_script('''window.open("{}");'''.format(url))
     except Exception as e:
         logger.error(f'Error opening link : {url}: {e}')
@@ -50,7 +51,8 @@ def filter_mt():
     Filter jobs for marketing test.
     :return: None
     """
-    open_url(MARKETING_TEST_URL, "_self")
+    driver = get_driver()
+    driver.open_url(MARKETING_TEST_URL, "_self")
     logger.debug("Filtered for Marketing test jobs")
 
 
@@ -79,7 +81,8 @@ def snap_history():
         if LiveControls.stop_link_open:
             logger.debug("Stopped snapshot:\tOpened: {}".format(opened))
             break
-        open_url(link, '_blank')
+        driver = get_driver()
+        driver.open_url(link, '_blank')
         opened += 1
         if TabsHandler.switch_to_tab_by_url(link):
             TabsHandler.close_active_tab()
@@ -131,7 +134,7 @@ def snap_history():
         pass
 
 
-def get_driver() -> Union[webdriver.Chrome, webdriver.Edge]:
+def get_driver() -> Edge:
     """
     Returns the current active webdriver
     :return:

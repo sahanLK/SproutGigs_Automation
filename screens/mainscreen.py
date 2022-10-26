@@ -24,6 +24,7 @@ from keyfunctions import KeyFunctions
 from PyQt5.QtCore import pyqtSignal
 import pathlib
 from ai import BooleanCheck
+from widgetshandler import MainScreenWidgetsHandler
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/mainscreen.log", 'w+')
@@ -124,6 +125,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             driver = get_driver()
             if driver:
                 jh.update_jobs()
+                LiveControls.jobs_running = True
                 t = threading.Thread(target=self.start_running)
                 t.start()
 
@@ -226,8 +228,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             sys_logger.error("DB_SUBMIT: Failed")
 
         # Enable the button again
-        self.but_db_submit.setText("Submit With Database")
-        self.but_db_submit.setEnabled(True)
+        MainScreenWidgetsHandler().but_db_submit_set_default()
 
     def miner_submit(self):
         """
@@ -293,8 +294,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             sys_logger.error("MINER_SUBMIT: Failed")
 
         # Enable the button again
-        self.but_miner_submit.setText("Submit With Miner")
-        self.but_miner_submit.setEnabled(True)
+        MainScreenWidgetsHandler().but_miner_submit_set_default()
 
     def show_developer_info(self):
         d = QDialog()

@@ -4,7 +4,7 @@ import threading
 import time
 import requests
 import logging
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError, ChunkedEncodingError
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -78,7 +78,7 @@ class MineBase:
             else:
                 logger.warning("Bad response ( {} ) from: {}".format(response.status_code, url))
                 return
-        except ConnectionError:
+        except (ConnectionError, ChunkedEncodingError):
             logger.debug(f"Connection error when requesting: {url}")
             return
 
@@ -260,26 +260,26 @@ class BlogData(MineBase, Filters):
 
     @property
     def titles(self):
-        no_dup = list(set(self._titles))
-        no_dup.sort(key=len, reverse=True)
+        no_dup = [title for title in set(self._titles) if title]  # Remove None values
+        no_dup.sort(key=len, reverse=True)  # If None values present in the list, this line will generate errors
         return no_dup
 
     @property
     def last_paragraphs(self):
-        no_dup = list(set(self._last_paragraphs))
-        no_dup.sort(key=len, reverse=True)
+        no_dup = [para for para in set(self._last_paragraphs) if para]  # Remove None values
+        no_dup.sort(key=len, reverse=True)  # If None values present in the list, this line will generate errors
         return no_dup
 
     @property
     def last_sentences(self):
-        no_dup = list(set(self._last_sentences))
-        no_dup.sort(key=len, reverse=True)
+        no_dup = [sen for sen in set(self._last_sentences) if sen]  # Remove None values
+        no_dup.sort(key=len, reverse=True)  # If None values present in the list, this line will generate errors
         return no_dup
 
     @property
     def last_words(self):
-        no_dup = list(set(self._last_words))
-        no_dup.sort(key=len, reverse=True)
+        no_dup = [word  for word in set(self._last_words) if word]  # Remove None values
+        no_dup.sort(key=len, reverse=True)  # If None values present in the list, this line will generate errors
         return no_dup
 
     def start(self):
@@ -726,8 +726,9 @@ class AdData(MineBase):
 
         # Ad site has not opened, open it in a new tab.
         logger.info("Opening ad site url in a new tab.")
-        from functions.driverfns import open_url
-        open_url(self.url, '_blank', self.driver)
+        from functions.driverfns import get_driver
+        driver = get_driver()
+        driver.open_url(self.url, '_blank')
         time.sleep(25)
         self.switch_to_ad_tab()
 

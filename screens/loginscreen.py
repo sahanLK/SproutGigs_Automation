@@ -29,7 +29,7 @@ def get_ip_from_aws():
     :return:
     """
     try:
-        ip = requests.get('https://checkip.amazonaws.com', timeout=5).text.strip()
+        ip = requests.get('https://ident.me/', timeout=5).text.strip()
         return ip
     except Exception as e:
         print(f"[ ERROR ]{' ' * 5}IP not detected.")
