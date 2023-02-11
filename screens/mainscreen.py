@@ -205,7 +205,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         ad_data = AdData(url, driver=get_driver())
         ad_domain = UrlMaster(ad_data.first_url).domain
 
-        if not ad_data.links and not (ad_data.about_url or ad_data.contact_url):
+        if not len(ad_data.links) > 3 and not (ad_data.about_url or ad_data.contact_url):
             # Ad data from database
             logger.info("DB_SUBMIT ->  Ad data from Database")
             sys_logger.debug("DB_SUBMIT: Ad data from database")
@@ -272,7 +272,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         ad_data = AdData(url, driver=get_driver())
         ad_domain = UrlMaster(ad_data.first_url).domain
 
-        if not ad_data.links and not (ad_data.about_url or ad_data.contact_url):
+        if not len(ad_data.links) > 3 and not (ad_data.about_url or ad_data.contact_url):
             # Using ad data from database.
             logger.info("MINER_SUBMIT ->  Using ad data from database")
             sys_logger.info("MINER_SUBMIT ->  Ad data from database")

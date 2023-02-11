@@ -4,7 +4,11 @@ import re
 Common expressions.
 """
 RE_NO_HTTP_LINK = re.compile(r'\s(\w+[^/:*])\.(\w+\d*)(?=\s|\b)([\w\d/&%#=-_]*)', flags=re.I)
-RE_HTTP_LINK = re.compile(r'\bhttps?://(\w+\d*)?\.?(\w+\d*)\.(\w+)([\w\d/.-]*)\b', flags=re.I)
+
+# Update the last group set to add any required character
+RE_HTTP_LINK = re.compile(r"\bhttps?://(\w+\d*-*)?\.?(\w+\d*-*)\.(\w+)([\w\d/.\-_~:\\?#\[\]@!$&'*+,;=]*)\b", flags=re.I)
+
+
 RE_NTH_NUMBER = re.compile(r'\b(1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th'
                            r'first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b', flags=re.I)
 RE_SINGLE_NUMBER = re.compile(r'\b(\d)\s')

@@ -33,6 +33,8 @@ class TestMainScreen(unittest.TestCase):
     def test_miner_submit(self):
         self.screen.miner_submit()
 
+    def test_get_blog_url(self):
+        pass
 
 
 if __name__ == "__main__":
