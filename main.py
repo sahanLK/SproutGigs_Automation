@@ -1,11 +1,11 @@
 import os
 import sys
 import logging
+import database
 from PyQt5.QtGui import QIcon
 from functions.fns import get_file_logger, get_syslogger
 from keycapture import key_listener
 from livecontrols import LiveControls
-from picoconstants import db_handler
 from screens.loginscreen import LoginScreen
 from screens.mainscreen import MainScreen
 from PyQt5.QtWidgets import QApplication
@@ -26,99 +26,9 @@ except ImportError:
 basedir = os.path.dirname(__file__)
 
 
-def __database_ok():
-    # Check the existence of all the required tables.
-    if not db_handler.tb_exists('accounts'):
-        cols = {
-            "email": "Varchar(255)",
-            "password": "Varchar(255)",
-            "device": "int(2)",
-        }
-        db_handler.create_tb('accounts', cols, 'email')
+# Setting up the database stuff
+database.main()
 
-    if not db_handler.tb_exists('blogs'):
-        cols = {
-            "blog_domain": "Varchar(255)",
-            "blog_links": "MEDIUMTEXT",
-            "post_titles": "MEDIUMTEXT",
-            "last_words": "MEDIUMTEXT",
-            "last_sentences": "MEDIUMTEXT",
-            "last_paragraphs": "MEDIUMTEXT",
-        }
-        db_handler.create_tb('blogs', cols, 'blog_domain')
-
-    if not db_handler.tb_exists('ad_sites'):
-        cols = {
-            "domain": "Varchar(255)",
-            "first_url": "MEDIUMTEXT",
-            "about_url": "MEDIUMTEXT",
-            "contact_url": "MEDIUMTEXT",
-            "links": "MEDIUMTEXT",
-        }
-        db_handler.create_tb('ad_sites', cols, 'domain')
-
-    if not db_handler.tb_exists('current_blog_and_ad_data'):
-        cols = {
-            "blog_links": "MEDIUMTEXT",
-            "titles": "MEDIUMTEXT",
-            "last_paragraphs": "MEDIUMTEXT",
-            "last_sentences": "MEDIUMTEXT",
-            "last_words": "MEDIUMTEXT",
-            "ad_first_opened": "MEDIUMTEXT",
-            "ad_contact_url": "MEDIUMTEXT",
-            "ad_about_url": "MEDIUMTEXT",
-            "ad_links": "MEDIUMTEXT",
-        }
-        db_handler.create_tb('current_blog_and_ad_data', cols)
-
-    if not db_handler.tb_exists('current_job_data'):
-        cols = {
-            "job_id": "Varchar(255)",
-            "ji_section": "Mediumtext",
-            "rp_section": "Mediumtext",
-            "ap_section": "Mediumtext",
-        }
-        db_handler.create_tb('current_job_data', cols, "job_id")
-
-    if not db_handler.tb_exists('login_info'):
-        cols = {
-            "ip_address": "Varchar(255)",
-            "email": "Varchar(255)",
-            "datetime": "DATETIME",
-        }
-        db_handler.create_tb('login_info', cols, "ip_address")
-
-    if not db_handler.tb_exists('ai_success'):
-        cols = {
-            "text": "VARCHAR(255)",
-            "decision": "int(2)",
-        }
-        db_handler.create_tb('ai_success', cols, 'text')
-
-    if not db_handler.tb_exists('ai_failed'):
-        cols = {
-            "text": "VARCHAR(255)",
-            "decisions": "Varchar(255)",
-        }
-        db_handler.create_tb('ai_failed', cols, 'text')
-
-    if not db_handler.tb_exists('earnings'):
-        cols = {
-            "date": "DATE",
-            "tasks": "INT",
-            "usd": "FLOAT",
-        }
-        db_handler.create_tb('earnings', cols, 'date')
-
-    if not db_handler.tb_exists('test_steps'):
-        cols = {
-            "step": "VARCHAR(255)",
-        }
-        db_handler.create_tb('test_steps', cols, 'step')
-    return True
-
-
-__database_ok()
 
 if __name__ == "__main__":
     # Activate Keylogger

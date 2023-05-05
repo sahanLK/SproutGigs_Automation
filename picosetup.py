@@ -2,16 +2,19 @@ import sys
 import logging
 from selenium.webdriver.common.by import By
 from functions.fns import get_file_logger, get_syslogger
-from picoconstants import *
+from constants import *
 from concurrent.futures import ThreadPoolExecutor
 from livecontrols import LiveControls
 from devices import device
 import pathlib
+from database import get_session, User
 
 base_dir = pathlib.Path(__file__).parent.absolute()
 
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/picosetup.log", 'w+')
 sys_logger = get_syslogger()
+
+session = get_session()
 
 
 class SetupPico:
@@ -42,13 +45,14 @@ class SetupPico:
         email, pwd, browser = args[0], args[1], args[2]
         LiveControls.browser = browser  # Will be useful when capturing screenshots.
 
-        device_record = db_handler.select_filtered('accounts', ['device'], f'email="{email}"')
-        if device_record:
-            device_no = device_record[0][0]
-            sys_logger.debug(f"Device No: {device_no}")
-        else:
-            sys_logger.critical("Device number could not be taken from database")
+        device_no = session.query(User.device).filter(
+            User.email.__eq__(email)).first()[0]
+
+        if not device_no or not isinstance(device_no, int):
+            sys_logger.critical(f"Invalid Device No: {device_no}")
             return
+        sys_logger.debug(f"Device No: {device_no}")
+
 
         # if browser == 'chrome':
         #     user_data_dir = os.path.join(PICO_LOCATION, email)

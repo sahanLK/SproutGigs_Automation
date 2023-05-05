@@ -21,19 +21,19 @@ class TestAi(unittest.TestCase):
 
     def test_get_decision(self):
         self.assertEqual(
-            Ai('Please give 1 Urls of the website you visited in step 3', test_mode=True).get_decision().decision_code, 7)
+            Ai('Please give 1 Urls of the website you visited in step 3', test_mode=True).decision().decision_code, 7)
         self.assertEqual(
-            Ai('Proof 1 step 5', test_mode=True).get_decision().decision_code, 7)
+            Ai('Proof 1 step 5', test_mode=True).decision().decision_code, 7)
         self.assertEqual(
-            Ai('Last sentence of 6th posts.', test_mode=True).get_decision().decision_code, 4)
+            Ai('Last sentence of 6th posts.', test_mode=True).decision().decision_code, 4)
         self.assertEqual(
-            Ai('Please give 2 Urls inside website you visited from step 5', test_mode=True).get_decision().decision_code, 7)
+            Ai('Please give 2 Urls inside website you visited from step 5', test_mode=True).decision().decision_code, 7)
 
         # Testing no of items required
         self.assertEqual(
-            Ai('Please give 2 Urls inside website you visited from step 5').get_decision().no_of_ad_links_req, 2)
+            Ai('Please give 2 Urls inside website you visited from step 5').decision().no_of_ad_links_req, 2)
         self.assertEqual(
-            Ai('Follow the step 4 to submit proof 3', test_mode=True).get_decision().no_of_ad_links_req, 0)
+            Ai('Follow the step 4 to submit proof 3', test_mode=True).decision().no_of_ad_links_req, 0)
 
     def test_get_http_links(self):
         self.assertEqual(Ai.get_http_links('go to https://t.me/do-it and visit 4 pages'), ['https://t.me/do-it'])

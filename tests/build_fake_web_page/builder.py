@@ -1,4 +1,4 @@
-from picoconstants import db_handler
+from constants import db_handler
 
 
 def build_fake_web_page():

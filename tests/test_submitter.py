@@ -1,7 +1,7 @@
 import unittest
 from submitter import ProofsSubmitter
 from selenium.webdriver import Edge
-from picoconstants import db_handler
+from constants import db_handler
 from jobshandler import JobsHandler
 
 submitter = ProofsSubmitter(test_mode=True)

@@ -1,10 +1,9 @@
 import logging
 from selenium.webdriver.common.by import By
 from livecontrols import LiveControls as Lc
-from functions.fns import get_from_db, get_file_logger, get_syslogger
+from functions.fns import get_file_logger, get_syslogger
 from functions.driverfns import get_driver, modify_doing_job_page
 from jobshandler import JobsHandler
-from submitter import ProofsSubmitter as Ps
 from tabshandler import TabsHandler
 import pathlib
 
@@ -18,11 +17,6 @@ th = TabsHandler()
 
 
 class KeyFunctions:
-    """
-    This proof submission class also used by submission widget buttons.
-    When submitting with keylogger, this methods should not accept field_id parameter.
-    Field_id parameter is passed only when submitting with submission widget buttons.
-    """
 
     @staticmethod
     def __get_submit_field():

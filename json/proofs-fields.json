@@ -7,14 +7,6 @@
       {
          "type": "text",
          "textarea_id": "proof_2"
-      },
-      {
-         "type": "text",
-         "textarea_id": "proof_3"
-      },
-      {
-         "type": "text",
-         "textarea_id": "proof_4"
       }
    ]
 }

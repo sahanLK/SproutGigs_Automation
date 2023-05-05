@@ -1,30 +1,29 @@
 import logging
-import sys
+import random
 import threading
-from typing import Union
-from PyQt5.QtWidgets import QAction, QApplication, QVBoxLayout
-from PyQt5.QtGui import QIcon
+import time
+from PyQt5.QtWidgets import QAction, QVBoxLayout, QScrollArea, QGroupBox, QPushButton
+from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import QMainWindow, QDialog
-from data_splitter import BlogsDataSplitter, AdDataSplitter
 from functions.driverfns import get_driver
-from functions.fns import list_to_str, get_file_logger, get_syslogger
+from functions.fns import get_file_logger, get_syslogger
 from jobshandler import JobsHandler
 from livecontrols import LiveControls
 from miner import BlogData, AdData
-from picoconstants import db_handler
-from submitter import ProofsSubmitter
 from tabshandler import TabsHandler
 from qtdesigner.main_screen import Ui_MainScreen
-from webcrapy.urlmaster import UrlMaster
 from qtdesigner.dialogconfirm import Ui_confirm_dialog
 from PyQt5.QtWidgets import QWidget
 from qtdesigner.widgets.widget_submission import Ui_submit_widget
+from qtdesigner.widgets.widget_job_update import Ui_job_update_widget
 from regexes import RE_HTTP_LINK
 from keyfunctions import KeyFunctions
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QThreadPool
 import pathlib
-from ai import BooleanCheck
+from ai import Ai, BooleanCheck
 from widgetshandler import MainScreenWidgetsHandler
+from database import get_session, SubmissionItemChoice
+from database import Job
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/mainscreen.log", 'w+')
@@ -33,15 +32,7 @@ sys_logger = get_syslogger()
 jh = JobsHandler()
 Kf = KeyFunctions()
 tabs_handler = TabsHandler()
-submitter = ProofsSubmitter()
-
-
-"""
-Both <BlogData> and <BlogDataSplitter> has same attribute names.
-Both <AdData> and <AdDataSplitter> has same attribute names.
-So they are commonly accesses here in the code. In case of class attribute name change in
-one of the class will produce errors.
-"""
+session = get_session()
 
 
 class SubmissionWidget(QWidget):
@@ -66,6 +57,135 @@ class SubmissionWidget(QWidget):
         self.widget.but_clear.clicked.connect(lambda: Kf.clear_textarea(self.id))
 
 
+class JobUpdateWidget(QWidget):
+    def __init__(self, sub_item, blog_data, ad_data, *args, **kwargs):
+        super(JobUpdateWidget, self).__init__(*args, **kwargs)
+        self.widget = Ui_job_update_widget()
+        self.widget.setupUi(self)
+
+        # set the submission item text
+        self.widget.item_text.setText(sub_item.text)
+
+        # Data required for submission
+        self.job: Job = sub_item.job
+        self.blog_data: BlogData = blog_data
+        self.ad_data: AdData = ad_data
+
+        # Change sub_item text font size
+        f = self.widget.item_text.font()
+        f.setPointSize(12)  # sets the size to 27
+        self.widget.item_text.setFont(f)
+
+        self.widget.but_af.clicked.connect(self.ad_first)
+        self.widget.but_ls.clicked.connect(self.last_sentence)
+        self.widget.but_al.clicked.connect(self.ad_link)
+        self.widget.but_lp.clicked.connect(self.last_paragraph)
+        self.widget.but_pt.clicked.connect(self.post_title)
+        self.widget.but_aa.clicked.connect(self.ad_about)
+        self.widget.but_ac.clicked.connect(self.ad_contact)
+        self.widget.but_bl.clicked.connect(self.post_link)
+        self.widget.but_lw.clicked.connect(self.last_word)
+
+        # The 5 choice fields
+        self.fields = [
+            self.widget.choice_1,
+            self.widget.choice_2,
+            self.widget.choice_3,
+            self.widget.choice_4,
+            self.widget.choice_5,
+        ]
+
+        # 5 clear buttons
+        self.widget.clear_choice_1.clicked.connect(lambda: self.widget.choice_1.clear())
+        self.widget.clear_choice_2.clicked.connect(lambda: self.widget.choice_2.clear())
+        self.widget.clear_choice_3.clicked.connect(lambda: self.widget.choice_3.clear())
+        self.widget.clear_choice_4.clicked.connect(lambda: self.widget.choice_4.clear())
+        self.widget.clear_choice_5.clicked.connect(lambda: self.widget.choice_5.clear())
+
+    def get_first_empty(self):
+        """
+        Gets the first empty choice field from 5 choice fields.
+        :return:
+        """
+        for f in self.fields:
+            if not f.text():
+                return f
+
+    def already_filled(self, item):
+        """
+        Check if the given item is already filled into another choice field or not.
+        """
+        for f in self.fields:
+            if f.text() == item:
+                return True
+
+    def ad_first(self):
+        field = self.get_first_empty()
+        if field:
+            if not self.already_filled(self.ad_data.first_url):
+                field.setText(self.ad_data.first_url)
+
+    def last_sentence(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.blog_data.last_sentences:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+    def ad_link(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.ad_data.links:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+    def last_paragraph(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.blog_data.last_paragraphs:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+    def post_title(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.blog_data.titles:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+    def ad_about(self):
+        field = self.get_first_empty()
+        if field:
+            if not self.already_filled(self.ad_data.about_url):
+                field.setText(self.ad_data.about_url)
+
+    def ad_contact(self):
+        field = self.get_first_empty()
+        if field:
+            if not self.already_filled(self.ad_data.contact_url):
+                field.setText(self.ad_data.contact_url)
+
+    def post_link(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.blog_data.posts:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+    def last_word(self):
+        field = self.get_first_empty()
+        if field:
+            for item in self.blog_data.last_words:
+                if not self.already_filled(item):
+                    field.setText(item)
+                    break
+
+
 class MainScreen(QMainWindow, Ui_MainScreen):
     """
     Main Screen of the application
@@ -76,8 +196,17 @@ class MainScreen(QMainWindow, Ui_MainScreen):
     """
     sig_update_widgets = pyqtSignal()
 
+    """
+    Signal: Job details update dialog open
+    """
+    sig_job_update = pyqtSignal()
+
     def __init__(self):
         super(MainScreen, self).__init__()
+        self.blog_data = None
+        self.ad_data = None
+        self.threadpool = QThreadPool()
+
         self.running = False
         self.driver = None
         self.setupUi(self)
@@ -91,22 +220,24 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         # Toolbar Actions
         run_action = QAction(QIcon('./icons/run-fast.png'), '', self)
         run_action.triggered.connect(self.start_or_stop)
+        run_action.setCheckable(True)
 
         autopilot_action = QAction(QIcon('./icons/bot.png'), '', self)
         autopilot_action.triggered.connect(self.activate_auto_pilot)
+        autopilot_action.setCheckable(True)
 
         # Adding actions into toolbar
         self.toolBar.addAction(autopilot_action)
         self.toolBar.addAction(run_action)
 
         # Defining button actions
-        self.but_db_submit.clicked.connect(self._thread_db_submit)
         self.but_miner_submit.clicked.connect(self._thread_miner_submit)
         self.but_skip.clicked.connect(self.job_skip)
         self.but_hide.clicked.connect(self.job_hide)
 
         # Slots for custom signals
         self.sig_update_widgets.connect(self.scroll_submit_widgets_update)
+        self.sig_job_update.connect(self.open_job_update_window)
 
         # ScrollArea
         self.scroll_submit_widgets.setWidgetResizable(True)
@@ -165,70 +296,9 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         matches = [match for match in RE_HTTP_LINK.finditer(url)]
         return url if matches else None
 
-    def _thread_db_submit(self):
-        t = threading.Thread(target=self.db_submit, daemon=True)
-        t.start()
-
     def _thread_miner_submit(self):
         t = threading.Thread(target=self.miner_submit, daemon=True)
         t.start()
-
-    def db_submit(self):
-        """
-        Actions for database submission button.
-        :return:
-        """
-        url = self.get_blog_url()
-        if not url:
-            sys_logger.debug("Blog url is empty or invalid. returning")
-            return
-        sys_logger.debug(f"DB_SUBMIT: initiated with {url}")
-        self.but_db_submit.setText("Submitting..")
-        self.but_db_submit.setEnabled(False)
-
-        blog_domain = UrlMaster(url).domain
-        record = db_handler.select_filtered('blogs', [], f'blog_domain="{blog_domain}"')
-
-        if record:  # Blog data from database
-            logger.info("Blog data from database")
-            sys_logger.debug("DB_SUBMIT: Blog data from database")
-            blog_data = BlogsDataSplitter(blog_domain)
-        else:   # Blog data from Miner
-            logger.info("DB_SUBMIT_BUT ->  Blog data from miner")
-            sys_logger.debug("DB_SUBMIT: Blog data from miner")
-            blog_data = BlogData(url,
-                                 mine_titles=BooleanCheck.titles_req(),
-                                 mine_post_content=BooleanCheck.post_data_req())
-            store_new_mined_blog_data(blog_domain, blog_data, force_rm_exist=False)
-
-        # Gathering Ad data
-        ad_data = AdData(url, driver=get_driver())
-        ad_domain = UrlMaster(ad_data.first_url).domain
-
-        if not len(ad_data.links) > 3 and not (ad_data.about_url or ad_data.contact_url):
-            # Ad data from database
-            logger.info("DB_SUBMIT ->  Ad data from Database")
-            sys_logger.debug("DB_SUBMIT: Ad data from database")
-
-            ad_data = AdDataSplitter()
-        else:
-            logger.info("Ad data from miner")
-            sys_logger.debug("DB_SUBMIT: Ad data from miner")
-            # Ad data from miner
-            # Miner found better ad data. Store it
-            store_new_mined_ad_data(ad_domain, ad_data)
-
-        blog_data = get_blog_data_as_dict(blog_data)
-        ad_data = get_ad_data_as_dict(ad_data)
-        if update_current_blog_and_ad_data(blog_data, ad_data):
-            sys_logger.info("DB_SUBMIT: Submitting proofs")
-            submit_proofs()
-            sys_logger.info("DB_SUBMIT: Done")
-        else:
-            sys_logger.error("DB_SUBMIT: Failed")
-
-        # Enable the button again
-        MainScreenWidgetsHandler().but_db_submit_set_default()
 
     def miner_submit(self):
         """
@@ -243,55 +313,111 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         self.but_miner_submit.setText("Submitting..")
         self.but_miner_submit.setEnabled(False)
 
-        blog_domain = UrlMaster(url).domain
-        blog_data = BlogData(url,
-                             mine_titles=BooleanCheck.titles_req(),
-                             mine_post_content=BooleanCheck.post_data_req())   # New blog data from miner
-        logger.debug("Blog data from miner")
-        sys_logger.debug("MINER_SUBMIT: Blog data from miner")
-        exists = BlogsDataSplitter(blog_domain)  # just for checking whether new data is better than older
+        job = JobsHandler.current_job_obj
+        if not job:
+            logger.critical("No active job running")
+            return
 
-        if exists.entry:
-            # Compare new blog data and old blog data. Then update the record if,
-            # new data is better than older data.
-            if len(blog_data.posts) >= len(exists.posts) and \
-                    len(blog_data.titles) >= len(exists.titles) and \
-                    len(blog_data.last_words) >= len(exists.last_words) and \
-                    len(blog_data.last_sentences) >= len(exists.last_sentences) and \
-                    len(blog_data.last_paragraphs) >= len(exists.last_paragraphs):
+        sub_items = [s.text for s in job.submission_items]
+        self.blog_data = BlogData(
+            url,
+            mine_titles=BooleanCheck.titles_req(sub_items),
+            mine_post_content=BooleanCheck.post_data_req(sub_items))
 
-                # Update the existing blog data record with new latest info.
-                store_new_mined_blog_data(blog_domain, blog_data, force_rm_exist=True)
-                logger.info("MINER_SUBMIT ->  Existing Blog data updated.")
-                sys_logger.info("MINER_SUBMIT ->  Existing Blog data updated.")
-            else:
-                logger.info("MINER_SUBMIT ->  Older blog data is better than new blog data.")
-                sys_logger.info("MINER_SUBMIT ->  Older blog data is better than new blog data.")
+        self.ad_data = AdData(url, driver=get_driver())
 
-        # Ad data from miner
-        ad_data = AdData(url, driver=get_driver())
-        ad_domain = UrlMaster(ad_data.first_url).domain
+        # Open the job details update window
+        # This window details should be properly filled.
+        self.sig_job_update.emit()
 
-        if not len(ad_data.links) > 3 and not (ad_data.about_url or ad_data.contact_url):
-            # Using ad data from database.
-            logger.info("MINER_SUBMIT ->  Using ad data from database")
-            sys_logger.info("MINER_SUBMIT ->  Ad data from database")
-            ad_data = AdDataSplitter()  # Will get ad data from database
-        else:
-            logger.info("MINER_SUBMIT ->  Ad data from miner")
-            sys_logger.info("MINER_SUBMIT ->  Ad data from miner")
-            # Update ad_sites table with this site, if a record does not exist for this site.
-            store_new_mined_ad_data(ad_domain, ad_data)
+    def open_job_update_window(self):
+        self.but_miner_submit.setEnabled(True)
 
-        blog_data = get_blog_data_as_dict(blog_data)
-        ad_data = get_ad_data_as_dict(ad_data)
+        self.d = QDialog(parent=self)
+        widget_layout = QVBoxLayout()
+        widget_layout.setSpacing(0)
 
-        if update_current_blog_and_ad_data(blog_data, ad_data):
-            sys_logger.info("MINER_SUBMIT: Submitting proofs")
-            submit_proofs()
-            sys_logger.info("MINER_SUBMIT: Done")
-        else:
-            sys_logger.error("MINER_SUBMIT: Failed")
+        job: Job = JobsHandler.current_job_obj
+
+        # All the update widgets
+        widgets = []
+
+        for sub_item in job.submission_items:
+            item = JobUpdateWidget(
+                sub_item=sub_item,
+                blog_data=self.blog_data,
+                ad_data=self.ad_data,
+            )
+            widget_layout.addWidget(item)
+            widgets.append(item)
+
+        groupbox = QGroupBox()
+        groupbox.setLayout(widget_layout)
+
+        scroll = QScrollArea()
+        scroll.setWidget(groupbox)
+        scroll.setWidgetResizable(True)
+        scroll.setFixedHeight(800)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(scroll)
+
+        save_btn = QPushButton("Update and Submit")
+        save_btn.setFont(QFont('Times', 10))
+        save_btn.setFixedHeight(50)
+        save_btn.clicked.connect(
+            lambda: self.save_and_submit(widgets))
+        main_layout.addWidget(save_btn)
+        self.d.setLayout(main_layout)
+        self.d.exec()
+
+    def save_and_submit(self, widgets):
+        def get_choices(sub_text):
+            """
+            Returns the choices according to the given
+            <SubmissionItem> text.
+            """
+            for w in widgets:
+                w: JobUpdateWidget = w
+                if w.widget.item_text.text() == sub_text:
+                    # Found the related submission item
+                    rel_choices = []
+                    for i in w.fields:
+                        rel_choices.append(i.text())
+                    return rel_choices
+
+        job = JobsHandler.current_job_obj
+        for sub_item in job.submission_items:
+            # get the choices for this submission item
+            choices = get_choices(sub_item.text)
+
+            for ch in choices:
+                obj = SubmissionItemChoice(text=ch)
+
+                # Add to the choices of current <SubmissionItem>
+                sub_item.choices.append(obj)
+
+        self.submit()
+        self.d.close()
+
+    @staticmethod
+    def submit():
+        """
+        Submit the proofs into the actual webpage
+        """
+        driver = get_driver()
+        job = JobsHandler.current_job_obj
+
+        for sub_item in job.submission_items:
+            print(sub_item.text, "-> ", sub_item.field_id)
+            # skip file submissions
+            if str(sub_item.field_id).lower().startswith('file'):
+                continue
+
+            # Fill the box
+            choice = random.choice(list(sub_item.choices))
+            tabs_handler.go_to_doing_job_tab()
+            driver.execute_script(f"$('#{sub_item.field_id}').val('{choice.text}');")
 
         # Enable the button again
         MainScreenWidgetsHandler().but_miner_submit_set_default()
@@ -308,12 +434,64 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         d = QDialog()
         d.exec()
 
-    def activate_auto_pilot(self):
+    @staticmethod
+    def activate_auto_pilot():
         """
-        A Special mode that submit tasks automatically, if the submitter can submit all the proofs.
-        Should be avoided using this method in case of poor auto submission capabilities.
+        Fully safe 100% automated action that select and submit tasks automatically
+        using the previously submitted tasks
         """
-        pass
+        driver = get_driver()
+
+        # get all the choices available jobs
+        jobs = set()
+        for job in session.query(Job).all():
+            choices_ok = True
+            for sub in job.submission_fields:
+                # Even if one submission field does not have choices, do not select
+                if not len(sub.choices) > 0:
+                    choices_ok = False
+                    break
+            if choices_ok:
+                jobs.add(job)
+
+        # Complete selected jobs one by one
+        for job in jobs:
+            url = jh.get_job_url(job.job_id)
+            driver.open_url(url, target='_blank', force_chk_config=False)
+            if not jh.go_to_doing_job_tab():
+                logger.warning(
+                    "Job has expired or another error occurred when switching to tab")
+                continue
+
+            for sub_item in job.submission_items:
+                # real textarea id of the submission page
+                textarea_id = sub_item.field_id
+                val = random.choice(sub_item.choices).text
+                # Fill the proofs
+                driver.execute_script(f"$('{textarea_id}').val('{val}');")
+
+            # # Start the submit button click process
+            # btn_text = driver.execute_script("return $('#submit-proof-btn').text();")
+            # btn_text = str(btn_text).lower().strip()
+            #
+            # if not btn_text == 'submit proof':
+            #     # Probably I need to wait some time before submission
+            #     _time = btn_text.split(' ')[1]
+            #     try:
+            #         minutes, seconds = int(_time.split(':')[0]), int(_time.split(':')[1])
+            #         total_wait = (minutes * 60) + seconds + 2
+            #         print(f"Waiting {total_wait} seconds for submission")
+            #         time.sleep(total_wait)
+            #     except ValueError:
+            #         logger.error(f"Error when splitting time counter value with: {_time}")
+            #         break
+            #
+            # # All good submit the job
+            # driver.execute_script("$('#submit-proof-btn').click();")
+            #
+            # # wait more than a monite before next job
+            print("Waiting more than a minute")
+            time.sleep(60 + random.randint(2, 10))
 
     def stop_running(self, *args):
         self.running = False
@@ -368,107 +546,11 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         d.exec()
 
 
-def submit_proofs():
-    if tabs_handler.go_to_doing_job_tab():
-        driver = get_driver()
-        submitter.submit_proofs(driver)
-
-
-def get_ad_data_as_dict(ad_data: Union[AdDataSplitter, AdData]) -> dict:
-    ad_data = {
-        "first_url": ad_data.first_url,
-        "about_url": ad_data.about_url,
-        "contact_url": ad_data.contact_url,
-        "links": list_to_str(ad_data.links),
-    }
-    return ad_data
-
-
-def get_blog_data_as_dict(blog_data: Union[BlogsDataSplitter, BlogData]) -> dict:
-    blog_data = {
-        "links": list_to_str(blog_data.posts),
-        "titles": list_to_str(blog_data.titles),
-        "paragraphs": list_to_str(blog_data.last_paragraphs),
-        "sentences": list_to_str(blog_data.last_sentences),
-        "words": list_to_str(blog_data.last_words),
-    }
-    return blog_data
-
-
-def store_new_mined_blog_data(domain: str, blog_data: BlogData, force_rm_exist: bool) -> None:
-    if not domain:
-        return
-
-    if force_rm_exist:
-        db_handler.delete_records('blogs', f'blog_domain="{domain}"')
-
-    try:
-        db_handler.add_record('blogs', [
-            domain,
-            list_to_str(blog_data.posts),
-            list_to_str(blog_data.titles),
-            list_to_str(blog_data.last_words),
-            list_to_str(blog_data.last_sentences),
-            list_to_str(blog_data.last_paragraphs),
-        ])
-        sys_logger.error(f"Table: blogs updated successfully")
-    except Exception as e:
-        sys_logger.error(f"Table: blogs update failed: {e}")
-
-
-def store_new_mined_ad_data(domain: str, ad_data: AdData) -> None:
-    # Store ad site data only if perfect.
-    about = ad_data.about_url
-    contact = ad_data.contact_url
-    links = list_to_str(ad_data.links)
-    first = ad_data.first_url
-    if not domain or not(about or contact) or len(links) < 3:
-        sys_logger.debug("Ad Data not enough for storing into database")
-        return  # Not perfect
-
-    try:
-        db_handler.add_record('ad_sites', [
-            domain,
-            first if first else '',
-            about if about else '',
-            contact if contact else '',
-            links,
-        ])
-    except Exception as e:
-        logger.info(f"Ad data storing failed: {e}")
-        sys_logger.warn(f"Ad data storing failed: {e}")
-
-
-def update_current_blog_and_ad_data(blog_data: dict, ad_data: dict):
-    """
-    Update the current_blog_and_ad_data table.
-    :param blog_data: dict:
-    :param ad_data: dict:
-    :return:
-    """
-    # Update the current blog and ad data table
-    db_handler.clear_tb('current_blog_and_ad_data')
-
-    try:
-        db_handler.add_record('current_blog_and_ad_data', [
-            blog_data['links'],
-            blog_data['titles'],
-            blog_data['paragraphs'],
-            blog_data['sentences'],
-            blog_data['words'],
-            ad_data['first_url'],
-            ad_data['contact_url'],
-            ad_data['about_url'],
-            ad_data['links'],
-        ])
-        sys_logger.debug(f"Table: current_blog_and_ad_data updated successfully")
-        return True
-    except Exception as e:
-        sys_logger.critical(f"Table: current_blog_and_ad_data update failed: {e}")
-
-
 if __name__ == "__main__":
+    from PyQt5.QtWidgets import QApplication
+    import sys
+
     app = QApplication(sys.argv)
-    screen = MainScreen()
-    screen.show()
-    app.exec()
+    window = MainScreen()
+    window.show()
+    app.exec_()

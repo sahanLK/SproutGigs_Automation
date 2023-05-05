@@ -1,9 +1,5 @@
 import logging
-import os.path
-import random
 import pyautogui
-from picoconstants import db_handler
-from typing import Union
 import pathlib
 
 
@@ -43,63 +39,11 @@ def str_cleaner(string, rem_spaces=False):
     """
     dirty_str = str(string)
     cleaned = dirty_str.strip('\n \t \b')
-    cleaned = cleaned.replace('\n', '')
+    cleaned = cleaned.replace('\n', '').replace('"', "'")
 
     if rem_spaces:
         cleaned = cleaned.strip(' ')
     return cleaned
-
-
-def list_to_str(values: list, separator="|"):
-    """
-    Combines a list values into a single string separated by a specified separator.
-    :param values:
-    :param separator: Separate character (default is |)
-    :return:
-    """
-    merged = ''
-    if values:
-        for val in values:
-            val = str(val).replace('"', "'")
-            merged += f'{val}{separator}'
-    return merged
-
-
-def str_to_list(text: str, separator="|"):
-    """
-    Reconstruct a list of strings from a merged single string.
-    :param text:
-    :param separator:
-    :return:
-    """
-    lst = []
-    if text:
-        lst = [item for item in str(text).split(separator) if item]
-    return lst
-
-
-def get_from_db(column: str, get_all: bool = False) -> Union[list, str]:
-    """
-    Returns the best result for the given column name.
-    Selections for all the submissions happens here.
-    :param get_all: If true all the results will be returned as a list.
-    :param column: Name of table column.
-    :return:
-    """
-    try:
-        items = db_handler.select_filtered('current_blog_and_ad_data', [str(column)])
-    except Exception as e:
-        print(f"Error when accessing table: {e}")
-        items = []
-
-    if len(items) > 1:
-        print('Warning: More than one entry exists in <current_blog_and_ad_data>.')
-    if items:
-        items = [item for item in str_to_list(items[0][0]) if item]
-        if get_all:
-            return items
-        selected = random.choice(items) if items else None
-        return selected
 
 
 def get_ascii(text: str) -> str:

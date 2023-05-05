@@ -3,13 +3,12 @@ from selenium import webdriver
 from selenium.common import UnexpectedAlertPresentException, WebDriverException, NoSuchWindowException
 
 from devices.device import Edge
-from functions.fns import get_from_db
-from picoconstants import (MARKETING_TEST_URL,
-                           CHROME_HISTORY_URL,
-                           EDGE_HISTORY_URL,
-                           SNAPSHOT_LOC,
-                           MAX_BLOG_URLS_REQ,
-                           MAX_AD_URLS_REQ)
+from constants import (MARKETING_TEST_URL,
+                       CHROME_HISTORY_URL,
+                       EDGE_HISTORY_URL,
+                       SNAPSHOT_LOC,
+                       MAX_BLOG_URLS_REQ,
+                       MAX_AD_URLS_REQ)
 from livecontrols import LiveControls
 import logging
 import pathlib

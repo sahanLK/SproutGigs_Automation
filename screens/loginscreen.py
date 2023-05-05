@@ -2,13 +2,13 @@ import logging
 import threading
 from datetime import datetime
 import requests
+from PyQt5.QtCore import QRunnable, QThreadPool
 from PyQt5.QtWidgets import QAction
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import QMainWindow, QListWidget, QVBoxLayout, QListWidgetItem, QDialog, QLineEdit
 from functions.driverfns import filter_mt
 from functions.fns import get_file_logger, get_syslogger
 from livecontrols import LiveControls
-from picoconstants import db_handler
 from picosetup import SetupPico
 from qtdesigner.login_screen import Ui_LoginScreen
 from qtdesigner.dialogearningstat import Ui_earning_stats
@@ -17,10 +17,14 @@ from qtdesigner.dialogconfirm import Ui_confirm_dialog
 from qtdesigner.dialog_add_account import Ui_add_account
 from tabshandler import TabsHandler
 import pathlib
+from database import get_session, User, LoginInfo, Earnings
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/loginscreen.log", 'w+')
 sys_logger = get_syslogger()
+
+# database session
+session = get_session()
 
 
 def get_ip_from_aws():
@@ -64,6 +68,8 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
 
     def __init__(self):
         super(LoginScreen, self).__init__()
+        self.threadpool = QThreadPool()
+
         self.add_account_dialog = None
         self.sign_in_confirm_dialog = None
         self.acc_select_dlg = None
@@ -130,7 +136,8 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
 
         # Hardcode the devices required. Devices should be added manually like below.
         # Also don't show the accounts that are already being assigned.
-        using = [device[0] for device in db_handler.select_filtered('accounts', ['device'])]
+        # using = [device[0] for device in db_handler.select_filtered('accounts', ['device'])]
+        using = [user.device for user in session.query(User).all()]
         allowed = [no+1 for no in range(self.no_of_devices) if no+1 not in using]
 
         # If all the devices in use, disable the combo box.
@@ -154,12 +161,12 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
 
         device_no = int(device.split()[1])
         # If the selected device has already associated with another account, do not add.
-        record = db_handler.select_filtered('accounts', ['device'], f'device={device_no}')
-        if record:
+        if session.query(User).filter(User.device == device_no).first():
             return
 
         try:
-            db_handler.add_record('accounts', [str(email), str(pwd), device_no])
+            session.add(User(email=email, pwd=pwd, device=device_no))
+            session.commit()
             self.close_add_acc_dialog()
         except Exception as e:
             print(e)
@@ -177,9 +184,9 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
         ui = Ui_earning_stats()
         ui.setupUi(d)
         today = str(datetime.now()).split()[0]
-        record = db_handler.select_filtered('earnings', ['tasks', 'usd'], f'date="{today}"')
+        record = session.query(Earnings).filter(Earnings.date == today).first()
         if record:
-            tasks, usd = record[0][0], record[0][1]
+            tasks, usd = record.tasks, record.usd
             ui.daily_tasks.setText(str(tasks))
             ui.daily_earned.setText(f"$ {usd}")
         d.exec_()
@@ -190,8 +197,7 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
         self.acc_select_dlg.setMaximumSize(400, 400)
         self.acc_select_dlg.setWindowTitle("Select an account")
 
-        self.active_accounts = {email: pwd for (email, pwd) in
-                                db_handler.select_filtered('accounts', ['email', 'password'])}
+        self.active_accounts = {email: pwd for (email, pwd) in session.query(User.email, User.pwd).all()}
 
         layout = QVBoxLayout()
         accounts = QListWidget()
@@ -262,15 +268,12 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
         logger.debug(f"[ OK ]{' ' * 5}Detected IPv4:  {self.current_ip}")
 
         # Check database for ip conflicts
-        entry = db_handler.select_filtered(
-            'login_info', ['ip_address', 'email', 'datetime'], f'ip_address="{self.current_ip}"')
+        entry = session.query(LoginInfo).filter(LoginInfo.ip == self.current_ip).first()
         if entry:
-            prev_account = entry[0][1]
-            date = str(entry[0][2]).split()[0]
-            time = str(entry[0][2]).split()[1]
-            if str(prev_account).lower() != curr_account.lower():
+            prev_account = entry.account
+            if entry.account.lower() != curr_account.lower():
                 # Current ip has used to log in for another account.
-                conflict_msg = f"IP conflict with  {prev_account}{' ' * 4}\nDate: {date} at {time}"
+                conflict_msg = f"IP conflict with  {prev_account}{' ' * 4}\nDate: {entry.date}"
                 logger.debug(conflict_msg)
                 self.system_stat_ui.ip_conflict_msg.setText(conflict_msg)
                 return False
@@ -292,23 +295,29 @@ class LoginScreen(QMainWindow, Ui_LoginScreen):
             # Check the ip address again because some DHCP connections can cause ip changes.
             ip = get_ip_from_aws()
             if ip != self.current_ip:
-                logger.debug(f"[ INFO ]{' ' * 5}IP change detected\n[ ERROR ]{' ' * 5}System recheck required.")
+                logger.debug(f"[ INFO ]{' ' * 5}IP change detected\n[ ERROR ]"
+                             f"{' ' * 5}System recheck required.")
                 return
 
             # Make a new record with new ip address, if it does not exist.
-            ip_exists = db_handler.select_filtered('login_info', ['ip_address'], f'ip_address="{self.current_ip}"')
-            if not ip_exists:
+            if not session.query(LoginInfo).filter(
+                    LoginInfo.ip == self.current_ip).first():
                 try:
                     timestamp = str(datetime.now()).split('.')[0]
-                    db_handler.add_record('login_info', [self.current_ip, self.input_email.text(), timestamp])
+                    session.add(LoginInfo(
+                        account=self.input_email.text(),
+                        ip=self.current_ip,
+                        date=timestamp))
+                    session.commit()
                 except Exception as e:
                     logger.critical(f"Error when updating login info: {e}\n Stopped sign in process")
                     return
 
             pico_setup = SetupPico()
-            pico_setup.init_setup(email=self.input_email.text(),
-                                  password=self.input_pwd.text(),
-                                  browser='edge')
+            pico_setup.init_setup(
+                email=self.input_email.text(),
+                password=self.input_pwd.text(),
+                browser='edge')
 
             if TabsHandler.go_to_jobs_tab():
                 filter_mt()

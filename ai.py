@@ -3,8 +3,7 @@ Analyze single step of the job page and provides a much better and accurate solu
 """
 import logging
 import re
-from picoconstants import db_handler
-from functions.fns import list_to_str, str_to_list, get_file_logger, get_syslogger
+from functions.fns import get_file_logger, get_syslogger
 from regexes import (RE_HTTP_LINK, RE_NO_HTTP_LINK, RE_ABOUT_URL,
                      RE_CONTACT_URL, RE_AD_LINK, RE_AD_LINK_2, RE_BLOG_POST_LINK, RE_TITLE,
                      RE_LAST_SENTENCE, RE_LAST_WORD, RE_SNAPSHOT, RE_CODE_SUBMIT,
@@ -21,12 +20,6 @@ sys_logger = get_syslogger()
 RE_BLOG_POST_ILLEGALS = re.compile(r'\b(words?|senten[cs]es?|paragraphs?|codes?|titles?|step|'
                                    r'pastebin|yahoo|bing|google\s\d)\b', flags=re.I)
 AD_INSIDE_ILLEGALS = re.compile(r'(sentences?|about us|contact us)', flags=re.I)
-
-
-def get_ap_section():
-    ap_section = db_handler.select_filtered('current_job_data', ['ap_section'])
-    ap_section = str_to_list(ap_section[0][0])
-    return ap_section
 
 
 class BooleanCheck:
@@ -47,12 +40,12 @@ class BooleanCheck:
         return False
 
     @staticmethod
-    def code_submit_req():
+    def code_submit_req(ap_section):
         """
         Check for code submission
         :return:
         """
-        for label in get_ap_section():
+        for label in ap_section:
             match = [match for match in RE_CODE_SUBMIT.finditer(label)]
             if match:
                 sys_logger.debug(f"Code submission detected")
@@ -60,25 +53,25 @@ class BooleanCheck:
         return False
 
     @staticmethod
-    def titles_req():
+    def titles_req(ap_section):
         """
         Determine if the submission requires the post titles
         :return:
         """
-        for label in get_ap_section():
+        for label in ap_section:
             match = [match for match in RE_TITLE.finditer(label)]
             if match:
                 return True
         return False
 
     @staticmethod
-    def post_data_req():
+    def post_data_req(ap_section):
         """
         Determine if the submission requires some kind of post data such as
         last paragraphs, sentences or words.
         :return:
         """
-        for label in get_ap_section():
+        for label in ap_section:
             para_match = [match for match in RE_LAST_PARAGRAPH.finditer(label)]
             if para_match:
                 return True
@@ -147,7 +140,7 @@ class Ai:
         if self.test_mode:
             logger.info("Running in test mode")
 
-    def get_decision(self) -> _Decision:
+    def decision(self) -> _Decision:
         """
         Returns the decision as an object(_Decision).
         :return:
@@ -187,20 +180,20 @@ class Ai:
         """
         self.clear()
         # First check the database for predefined solution.
-        if not self.test_mode:
-            decision = db_handler.select_filtered('ai_success', ['decision'], f'text="{self.txt}"', limit=1)
-            if decision:
-                logger.info("Predefined decision found. not running Ai methods.")
-                self.decisions.append(decision[0][0])
-
-                # Even if the decision is available, check some other requirements for submission
-                self.__detect_multi_blog_links()
-                self.__detect_multi_titles()
-                self.__detect_multi_words()
-                self.__detect_multi_sentences()
-                self.__detect_multi_paragraphs()
-                self.__detect_multi_ad_links()
-                return
+        # if not self.test_mode:
+        #     decision = db_handler.select_filtered('ai_success', ['decision'], f'text="{self.txt}"', limit=1)
+        #     if decision:
+        #         logger.info("Predefined decision found. not running Ai methods.")
+        #         self.decisions.append(decision[0][0])
+        #
+        #         # Even if the decision is available, check some other requirements for submission
+        #         self.__detect_multi_blog_links()
+        #         self.__detect_multi_titles()
+        #         self.__detect_multi_words()
+        #         self.__detect_multi_sentences()
+        #         self.__detect_multi_paragraphs()
+        #         self.__detect_multi_ad_links()
+        #         return
 
         # No database entry, matching the patterns.
         self.rq_blog_post()
@@ -212,37 +205,37 @@ class Ai:
         self.rq_ad_contact()
         self.rq_ad_inside()
 
-        self.__update_db_with_txt()
-
-    def __update_db_with_txt(self):
-        """
-        Insert the given text into a suitable database table.
-        :return:
-        """
-        # According to the decisions that has taken, store them properly in the database.
-        if not self.test_mode:
-            # Check if the current text is already exists in the tables.
-            in_ai_success = db_handler.select_filtered('ai_success', ['text'], f'text="{self.txt}"')
-            in_ai_failed = db_handler.select_filtered('ai_failed', ['text'], f'text="{self.txt}"')
-
-            try:
-                if len(self.decisions) == 1:  # Good decision.
-                    if not in_ai_success:
-                        db_handler.add_record('ai_success', [self.txt, self.decisions[0]])
-                        return
-
-                fault_decisions = list_to_str(self.decisions)
-                if len(self.decisions) > 1:  # Bad output. Multiple decisions
-                    if not in_ai_failed:
-                        db_handler.add_record('ai_failed', [self.txt, fault_decisions])
-                        return
-
-                if not self.decisions:  # Bad output. Completely failed
-                    if not in_ai_failed:
-                        db_handler.add_record('ai_failed', [self.txt, fault_decisions])
-                        return
-            except Exception as e:
-                logger.info("Database update failed: {}".format(e))
+    #     self.__update_db_with_txt()
+    #
+    # def __update_db_with_txt(self):
+    #     """
+    #     Insert the given text into a suitable database table.
+    #     :return:
+    #     """
+    #     # According to the decisions that has taken, store them properly in the database.
+    #     if not self.test_mode:
+    #         # Check if the current text is already exists in the tables.
+    #         in_ai_success = db_handler.select_filtered('ai_success', ['text'], f'text="{self.txt}"')
+    #         in_ai_failed = db_handler.select_filtered('ai_failed', ['text'], f'text="{self.txt}"')
+    #
+    #         try:
+    #             if len(self.decisions) == 1:  # Good decision.
+    #                 if not in_ai_success:
+    #                     db_handler.add_record('ai_success', [self.txt, self.decisions[0]])
+    #                     return
+    #
+    #             fault_decisions = list_to_str(self.decisions)
+    #             if len(self.decisions) > 1:  # Bad output. Multiple decisions
+    #                 if not in_ai_failed:
+    #                     db_handler.add_record('ai_failed', [self.txt, fault_decisions])
+    #                     return
+    #
+    #             if not self.decisions:  # Bad output. Completely failed
+    #                 if not in_ai_failed:
+    #                     db_handler.add_record('ai_failed', [self.txt, fault_decisions])
+    #                     return
+    #         except Exception as e:
+    #             logger.info("Database update failed: {}".format(e))
 
     @staticmethod
     def get_http_links(text: str) -> list:
@@ -434,9 +427,9 @@ class Ai:
 
 
 if __name__ == "__main__":
-    from picoconstants import db_handler
+    from constants import db_handler
 
     failed = [step[0] for step in db_handler.select_filtered('ai_failed', ['text']) if step]
     for step in failed:
         o = Ai(step, test_mode=True)
-        print(o.get_decision().decision_code)
+        print(o.decision().decision_code)

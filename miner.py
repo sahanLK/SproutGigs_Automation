@@ -34,17 +34,6 @@ logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/miner.log", 
 sys_logger = get_syslogger()
 
 
-def calc_network_time(func):
-    def wrapper(self, url):
-        s = time.perf_counter()
-        response = func(self, url)
-        e = time.perf_counter()
-        logger.info(f"Network request finished in {round(e - s, 3)} second(s)\t-> {url}")
-        return response
-
-    return wrapper
-
-
 class MineBase:
     """
     All common attributes and methods for blog and ad data mining.

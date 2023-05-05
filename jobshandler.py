@@ -1,31 +1,57 @@
 import re
 import time
 import logging
-import settings
 from datetime import datetime
-from ai import BooleanCheck
-from functions.fns import list_to_str, str_cleaner, get_file_logger, get_syslogger, get_ascii
+from functions.fns import str_cleaner, get_file_logger, get_syslogger, get_ascii
 from functions.driverfns import filter_mt, get_driver, modify_doing_job_page
 from livecontrols import LiveControls
-from picoconstants import DOING_JOB_PAGE_INITIALS, HIDE_JOB_CLSNAME
+from constants import DOING_JOB_PAGE_INITIALS, HIDE_JOB_CLSNAME, JOB_TITLE_CLASS, JOB_PAYMENT_CLASS
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from regexes import RE_HTTP_LINK, RE_NO_HTTP_LINK
 from tabshandler import TabsHandler
-from functions import easyjson
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, NoSuchWindowException
-from picoconstants import db_handler
-from submitter import ProofsSubmitter
 from widgetshandler import MainScreenWidgetsHandler
 from pathlib import Path
+from database import get_session, InstructionItem, SubmissionItem, Job, Earnings
+from sqlalchemy.sql import and_
+from sqlalchemy.exc import IntegrityError
 
 base_dir = Path(__file__).parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/jobshandler.log", 'w+')
 sys_logger = get_syslogger()
 
 
-Ps = ProofsSubmitter()
+session = get_session()
+
+
+def get_no_br_html(html: str):
+    """
+    Replace all the <br> tags from the whole html page. This is done to prevent
+    matching wrong urls form the Ji_section. If this method did not use before
+    storing data into table[current_job_data], wrong and invalid urls will be opened
+    by [JobsHandler.open_req_urls()]
+    :param html:
+    :return:
+    """
+    try:
+        rm_br = re.sub(r"<br>|</br>|<br/>", " ", html)
+        return rm_br
+    except Exception as e:
+        sys_logger.error(f"Error when removing <br> from source: {e}")
+
+
+def get_clean_step(step: str) -> str:
+    """
+    Clean the step given by removing initial number, dot and other spaces that exists at the
+    beginning and the end of the step. This method is used to provide much cleaner text for the
+    Ai module and database storage.
+    :return:
+    """
+    cleaned = re.sub(r'^\d\.\s', '', step)
+    cleaned = re.sub(r'\|', ' ', cleaned)
+    return cleaned.strip('\n :>')
 
 
 class JobsHandler(TabsHandler):
@@ -38,11 +64,19 @@ class JobsHandler(TabsHandler):
     """
     jobs_pool = iter
 
+    """
+    The <Job> object of the currently ongoing job.
+    This object is stored after saving the job page data.
+    """
+    current_job_obj = None
+
     def __init__(self):
         super(JobsHandler, self).__init__()
         self.driver = None
         self.actions = None
         self.current_job_id = None
+        self.current_job_payment = None
+        self.page_source = None  # Cleaned job page source
 
     def update_jobs(self):
         """
@@ -72,6 +106,13 @@ class JobsHandler(TabsHandler):
     def store_job_ids(cls, job_ids: list):
         cls.jobs_pool = iter(job_ids)
 
+    @staticmethod
+    def get_job_url(job_id):
+        """
+        Give me the job id and I will give you the url of the job
+        """
+        return f'{DOING_JOB_PAGE_INITIALS}{job_id}'
+
     def select_a_job(self):
         """
         Selects the job from the <jobs_pool> list, referring to the given index.
@@ -92,7 +133,7 @@ class JobsHandler(TabsHandler):
         except Exception as e:
             sys_logger.critical(f"Unexpected error while getting a Job ID: {e}")
 
-        job_url = f'{DOING_JOB_PAGE_INITIALS}{self.current_job_id}'
+        job_url = self.get_job_url(self.current_job_id)
         driver = get_driver()
         driver.open_url(job_url, target='_blank', force_chk_config=False)
 
@@ -102,40 +143,76 @@ class JobsHandler(TabsHandler):
             return False
 
         logger.info(f"\n\nJob selected: {job_url}")
-        sys_logger.info(f"Job selected: {job_url}")
 
-        job_page_source = self.__get_job_page_source()
-        if job_page_source:
+        # Setting up the current job page source after cleaning properly
+        # This should be properly cleaned because, this will be accessed all over this class.
+        self.page_source = self.__get_job_page_source()
+
+        if self.page_source:
             modify_doing_job_page()
-            if self.store_job_page_data(job_page_source):
-                if BooleanCheck.code_submit_req():
-                    if settings.CODE_SUBMIT_JOBS == 'hide':
-                        self.hide_job()
-                    self.select_a_job()
-                    return False
-                else:
-                    self.open_req_urls()
+            if self.store_job_page_data():
+                self.open_req_urls()
                 return True
             else:
                 self.select_a_job()
                 return False
         return False
 
-    @staticmethod
-    def open_req_urls():
+    @property
+    def already_done(self):
+        """
+        Check if the opened job is already done or not.
+        """
+        # Check if the job already exists with current job title and id
+        job = session.query(Job).filter(
+            and_(
+                Job.title.__eq__(self.job_title),
+                Job.job_id.__eq__(self.current_job_id)))
+
+        if not job:
+            logger.info(f"No job exists with ID({self.current_job_id})"
+                        f" and title({self.job_title})")
+            return False
+
+        # At this point a job has found with current job title and ID.
+        # Noe check if the instruction_items and submission_items are equal or not
+        # If those 2 matched, we found a previously done job
+
+        # Check if no.of items in the comparing lists are equal
+        ji = self.get_ji_section()
+        if not len(ji) == len(job.instruction_items):
+            return False
+
+        ap = self.get_ap_section()
+        if not len(ap) == len(job.submission_items):
+            return False
+
+        # If lengths are equal, check for item equalities
+        for ins_item in ji:
+            if ins_item not in job.instruction_items:
+                return False
+
+        for sub_item in self.get_ap_section():
+            if sub_item not in job.submission_items:
+                return False
+        return True
+
+    def open_req_urls(self):
         """
         Open the urls found in the job info section.
         :return:
         """
         sys_logger.debug("Opening urls in JI section")
-        ji = db_handler.select_filtered('current_job_data', ['ji_section'], '', 1)
-        links_http = {link.group(0) for link in RE_HTTP_LINK.finditer(str(ji))}
+        ji_str = ""
+        for i in self.get_ji_section():
+            ji_str += i
+        links_http = {link.group(0) for link in RE_HTTP_LINK.finditer(ji_str)}
         sys_logger.debug(f"Found Http Links: {len(links_http)} from Ji_section")
-        links_no_http = [f"https://{url.group(0).strip()}" for url in RE_NO_HTTP_LINK.finditer(str(ji))]
+        links_no_http = [f"https://{url.group(0).strip()}" for url in RE_NO_HTTP_LINK.finditer(ji_str)]
         sys_logger.debug(f"Found Non-Http Links: {len(links_no_http)} from Ji_section")
         if (len(links_http) >= 8) or (len(links_no_http) >= 8):
             sys_logger.debug("Too many urls found. Not opening anything.")
-            return
+            return True
 
         links_http.update(links_no_http)
         sys_logger.debug(f"Total links from ji_section: {len(links_http)}")
@@ -148,33 +225,93 @@ class JobsHandler(TabsHandler):
             self.go_to_doing_job_tab()
             driver = get_driver()
             if driver.current_url.startswith(DOING_JOB_PAGE_INITIALS):
-                job_page_source = driver.page_source
+                source = driver.page_source
+                cleaned = get_no_br_html(get_ascii(source))
                 sys_logger.debug("Current job page source returned")
-                return job_page_source
+                return cleaned
         except Exception as e:
             logger.error(f"Error when getting current job page source: {e}")
             sys_logger.error(f"Error when getting current job page source: {e}")
 
-    def store_job_page_data(self, page_source):
+    @property
+    def job_title(self):
+        soup = BeautifulSoup(self.page_source, 'lxml')
+        title = soup.select_one(f".{JOB_TITLE_CLASS}").text
+        return str_cleaner(title)
+
+    def get_ji_section(self):
+        soup = BeautifulSoup(self.page_source, 'lxml')
+        steps = [str_cleaner(step.text) for step in
+                 soup.find('div', {"id": "job-instructions"}).find_all('li')]
+        if not steps:
+            logger.warning("Job Info could not be determined.")
+        return steps
+
+    def get_ap_section(self) -> dict:
+        soup = BeautifulSoup(self.page_source, 'lxml')
+        steps = {group.label['for']: get_clean_step(str_cleaner(
+            BeautifulSoup(str(group.label), 'lxml').text))
+            for group in soup.find(
+                'form', {"id": "task-proofs"}).find(
+                'div', {"class": "job-info-list"}).find_all(
+                "div", {'class': 'form-group'}) if group.label}
+
+        if not steps:
+            logger.warning("Actual Proofs could not be determined.")
+        return steps
+
+    def get_current_job_payment(self):
+        soup = BeautifulSoup(self.page_source, 'lxml')
+        price = soup.find('div', {'class': JOB_PAYMENT_CLASS}).find('span').text
+        return float(price)
+
+    def store_job_page_data(self):
         """
         Saving job page source and sections appropriately into a jason file.
-        :param page_source:
-        :return:
         """
-        job_data_saver = _JobDataSaver(str(page_source))
-        ji_section = job_data_saver.get_ji_section()
-        ap_section = job_data_saver.get_ap_section()
-        job_data_saver.store_submission_fields()
+        ji_section = self.get_ji_section()
+        ap_section = self.get_ap_section()
+
+        job = Job(job_id=self.current_job_id, title=self.job_title)
+        session.add(job)
 
         try:
-            db_handler.clear_tb('current_job_data')
-            db_handler.add_record('current_job_data', ['self.current_job_id', ji_section, '', ap_section])
-            logger.debug("Successfully stored current job page data.")
-            sys_logger.debug("Successfully stored current job page data.")
-            return True
-        except Exception as e:
-            logger.error(f'Storing job page data failed: {e}')
-            sys_logger.error(f'Storing job page data failed: {e}')
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+
+            # Delete the overlapping old job and add new one
+            prev = session.query(Job).filter(
+                Job.job_id.__eq__(self.current_job_id)).first()
+            session.delete(prev)
+            session.commit()
+            session.add(job)
+            session.commit()
+
+        for i in ji_section:
+            # <InstructionItem> text is unique and one item can be owned by
+            # multiple jobs. So before adding these items, check if already
+            # exists with same text, to avoid getting DuplicateEntry errors
+            ins_item = session.query(InstructionItem).filter(
+                InstructionItem.text == i).first()
+
+            if not ins_item:
+                ins_item = InstructionItem(job_id=job.id, text=i)
+            job.instruction_items.append(ins_item)
+
+        # One submission item can only be owned by one Job.
+        for i in ap_section:
+            job.submission_items.append(
+                SubmissionItem(job_id=job.id, text=ap_section[i], field_id=i))
+
+        self.set_current_job_obj(job)
+        self.current_job_payment = self.get_current_job_payment()
+        sys_logger.debug("Successfully stored current job page data.")
+        return True
+
+    @classmethod
+    def set_current_job_obj(cls, job):
+        cls.current_job_obj = job
 
     def skip_job(self):
         """
@@ -184,11 +321,31 @@ class JobsHandler(TabsHandler):
         if not LiveControls.driver:
             return
 
+        # If the current job is skipping without any choices
+        # for the submission fields, that means the job is skipping
+        # without submitting. Those jobs should be deleted because,
+        # sometimes when running the programme again, the same job
+        # will try to save the job into database. And that will generate
+        # errors because job_id is unique. To prevent this, when skipping a job,
+        # if it doesn't have any choices, delete it
+        choices_ok = True
+        if self.current_job_id:
+            for sub in self.current_job_obj.submission_fields:
+                # Even if one submission field does not have choices, do not select
+                if not len(sub.choices) > 0:
+                    choices_ok = False
+                    break
+            if not choices_ok:
+                session.delete(self.current_job_obj)
+                session.commit()
+
+        self.page_source = None
+        self.current_job_obj = None
+        self.current_job_id = None
+        self.current_job_payment = None
+
         self.close_junk_tabs()
-        self.go_to_doing_job_tab()
-        self.close_active_tab()
-        self.clear_active_job_data()
-        Ps.clear_cache()
+        self.close_doing_job_tab()
         LiveControls.set_default()
 
         self.clear_submission_widgets()
@@ -199,6 +356,33 @@ class JobsHandler(TabsHandler):
         wh.but_miner_submit_set_default()
         logger.info("Job skipped.")
         sys_logger.info("Job skipped\n\n")
+
+    def submit_job(self):
+        """
+        Clicks the submit button.
+        WARNING: Should only use after filling all the proofs successfully.
+        """
+        if self.go_to_doing_job_tab():
+            driver = get_driver()
+            try:
+                driver.execute_script(open('js/click-submit-button.js').read())
+                sys_logger.error(f"Job submitted")
+            except Exception as e:
+                sys_logger.error(f"Job submission failed: {e}")
+            self.update_daily_earnings()
+
+    def update_daily_earnings(self):
+        # Try to update the database for calculating the daily earning.
+        today = str(datetime.now()).split()[0]
+        record = session.query(Earnings).filter(Earnings.date.__eq__(today)).first()
+        if record:
+            record.tasks = record.tasks + 1
+            record.usd = record.usd + self.current_job_payment
+            session.commit()
+        else:
+            # First job submission today
+            session.add(
+                Earnings(date=today, tasks=1, usd=self.current_job_payment))
 
     @staticmethod
     def clear_submission_widgets():
@@ -226,7 +410,6 @@ class JobsHandler(TabsHandler):
 
             self.close_active_tab()
             self.close_junk_tabs()
-            self.clear_active_job_data()
             self.clear_submission_widgets()
             logger.info('Job Hiding Successful.')
             sys_logger.info('Job Hiding Successful.')
@@ -235,130 +418,3 @@ class JobsHandler(TabsHandler):
                 NoSuchWindowException):
             logger.warning("Job hiding failed.")
             pass
-
-    def submit_job(self):
-        """
-        Clicks the submit button.
-        WARNING: Should only use after filling all the proofs successfully.
-        :return:
-        """
-        if self.go_to_doing_job_tab():
-            driver = get_driver()
-            try:
-                driver.execute_script(open('js/click-submit-button.js').read())
-                sys_logger.error(f"Job submitted")
-            except Exception as e:
-                sys_logger.error(f"Job submission failed: {e}")
-
-            # Try to update the database for calculating the earni1ng.
-            today = str(datetime.now()).split()[0]
-            record = db_handler.select_filtered('earnings', ['date', 'tasks', 'usd'], f'date="{today}"')
-            if record:
-                # This is not the first job submitting today.
-                # This should be a database record update. But because of an update method error in
-                # the ezmysqlpy module, this is done by deleting the existing record as an alternative.
-                db_handler.delete_records('earnings', f'date="{today}"')
-                tasks, usd = int(record[0][1]) + 1, float(record[0][2]) + 0.03
-                db_handler.add_record('earnings', [today, tasks, usd])
-            else:
-                db_handler.add_record('earnings', [today, 1, 0.03])
-
-    @staticmethod
-    def clear_active_job_data():
-        db_handler.clear_tb('current_job_data')
-        db_handler.clear_tb('current_blog_and_ad_data')
-
-
-class _JobDataSaver:
-    def __init__(self, job_html: str):
-        super(_JobDataSaver, self).__init__()
-        self.html = self.__get_no_br_html(get_ascii(job_html))
-
-    @staticmethod
-    def __get_no_br_html(html: str):
-        """
-        Replace all the <br> tags from the whole html page. This is done to prevent
-        matching wrong urls form the Ji_section. If this method did not use before
-        storing data into table[current_job_data], wrong and invalid urls will be opened
-        by [JobsHandler.open_req_urls()]
-        :param html:
-        :return:
-        """
-        try:
-            rm_br = re.sub(r"<br>|</br>|<br/>", " ", html)
-            return rm_br
-        except Exception as e:
-            sys_logger.error(f"Error when removing <br> from source: {e}")
-
-    def get_ji_section(self):
-        """
-        Stores Job Info Section into the json file.
-        :return:
-        """
-        soup = BeautifulSoup(self.html, 'lxml')
-        steps = [str_cleaner(step.text) for step in soup.find('div', {"id": "job-instructions"}).find_all('li')]
-        if not steps:
-            logger.warning("Job Info could not be determined.")
-        merged = list_to_str(steps)
-        return merged
-
-    def get_ap_section(self):
-        soup = BeautifulSoup(self.html, 'lxml')
-        steps = [str_cleaner(BeautifulSoup(str(group.label), 'lxml').text)
-                 for group in soup.find(
-                'form', {"id": "task-proofs"}).find(
-                'div', {"class": "job-info-list"}).find_all(
-                "div", {'class': 'form-group'}) if group.label]
-        if not steps:
-            logger.warning("Actual Proofs could not be determined.")
-        cleaned_steps = [self.get_clean_step(step) for step in steps]
-        merged = list_to_str(cleaned_steps)
-        return merged
-
-    @staticmethod
-    def get_clean_step(step: str) -> str:
-        """
-        Clean the step given by removing initial number, dot and other spaces that exists at the
-        beginning and the end of the step. This method is used to provide much cleaner text for the
-        Ai module and database storage.
-        :return:
-        """
-        cleaned = re.sub(r'^\d\.\s', '', step)
-        cleaned = re.sub(r'\|', ' ', cleaned)
-        return cleaned.strip('\n :>')
-
-    def store_submission_fields(self):
-        """
-        Save submission fields ids along with their type [file|text] to a json file.
-        :return:
-        """
-        soup = BeautifulSoup(self.html, 'lxml')
-        form_groups = soup.find('form', {"id": "task-proofs"}).find_all('div', {"class": "form-group"})
-        form_groups.pop()
-
-        all_proofs = []
-        for group in form_groups:
-            textarea = group.textarea
-            input_tag = group.input
-
-            file_submit = None
-            if input_tag:
-                # Check if the value of 'type' attribute is equal to 'file'
-                bs4 = BeautifulSoup(str(input_tag), 'lxml')
-                found = bs4.find('input', type='file')
-                file_submit = True if found else None
-
-            proof_type = elem_id = None
-            if textarea and file_submit:
-                # If both inputs available, then it is probably a file submission. <textarea> is optional.
-                proof_type = 'file'
-                elem_id = input_tag['id']
-            if textarea and not file_submit:
-                proof_type = 'text'
-                elem_id = textarea['id']
-
-            proof = {"type": proof_type, "textarea_id": elem_id}
-            all_proofs.append(proof)
-
-        # Save submission field type(text/file) and the ID of the submission field to use later.
-        easyjson.into_json('proofs_submission_fields', all_proofs, 'json/proofs-fields.json')

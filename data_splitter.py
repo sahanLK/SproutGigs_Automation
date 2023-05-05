@@ -1,5 +1,4 @@
 import random
-from picoconstants import db_handler
 
 
 class BlogsDataSplitter:

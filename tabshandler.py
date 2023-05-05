@@ -1,6 +1,6 @@
 from selenium.common import NoSuchWindowException
 from functions.fns import get_file_logger, get_syslogger
-from picoconstants import DOING_JOB_PAGE_INITIALS, MARKETING_TEST_URL
+from constants import DOING_JOB_PAGE_INITIALS, MARKETING_TEST_URL
 from functions.driverfns import get_driver, get_current_url, switch_to_any_tab
 import logging
 from pathlib import Path
@@ -44,6 +44,10 @@ class TabsHandler:
                     logger.info("Switched To: Doing Job Tab")
                     return True
             logger.warning("Failed To Switch: Doing Job Tab")
+
+    def close_doing_job_tab(self):
+        self.go_to_doing_job_tab()
+        self.close_active_tab()
 
     @staticmethod
     def go_to_jobs_tab():

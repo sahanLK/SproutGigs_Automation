@@ -1,6 +1,6 @@
 import sys
 import unittest
-from picoconstants import db_handler
+from constants import db_handler
 from screens.mainscreen import MainScreen
 from PyQt5.QtWidgets import QApplication
 
