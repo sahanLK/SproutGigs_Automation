@@ -1,5 +1,4 @@
 import logging
-import pyautogui
 import pathlib
 
 
@@ -13,7 +12,7 @@ def get_syslogger() -> logging.getLogger():
     logger = logging.getLogger("SystemLogger")
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('[%(levelname)s] [%(filename)s  %(funcName)s] line %(lineno)d:  %(message)s')
-    file_handler = logging.FileHandler(f"{base_dir}/logs/SYSTEM.LOG", 'w+')
+    file_handler = logging.FileHandler(f"{base_dir}/SYSTEM.LOG", 'w+')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     return logger
@@ -21,13 +20,6 @@ def get_syslogger() -> logging.getLogger():
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
 sys_logger = get_syslogger()
-
-
-def adjust_screen_size():
-    scr_width, scr_height = pyautogui.size()
-    proper_width, proper_height = (scr_width / 3), scr_height
-    proper_size = (proper_width, proper_height)
-    return proper_size
 
 
 def str_cleaner(string, rem_spaces=False):
