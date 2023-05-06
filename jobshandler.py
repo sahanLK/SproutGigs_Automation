@@ -2,6 +2,8 @@ import re
 import time
 import logging
 from datetime import datetime
+
+from ai import BooleanCheck
 from functions.fns import str_cleaner, get_file_logger, get_syslogger, get_ascii
 from functions.driverfns import filter_mt, get_driver, modify_doing_job_page
 from livecontrols import LiveControls
@@ -9,7 +11,7 @@ from constants import DOING_JOB_PAGE_INITIALS, HIDE_JOB_CLSNAME, JOB_TITLE_CLASS
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-from regexes import RE_HTTP_LINK, RE_NO_HTTP_LINK
+from regexes import RE_HTTP_LINK, RE_NO_HTTP_LINK, RE_CODE_SUBMIT
 from tabshandler import TabsHandler
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, NoSuchWindowException
 from widgetshandler import MainScreenWidgetsHandler
@@ -21,7 +23,6 @@ from sqlalchemy.exc import IntegrityError
 base_dir = Path(__file__).parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/jobshandler.log", 'w+')
 sys_logger = get_syslogger()
-
 
 session = get_session()
 
@@ -118,8 +119,9 @@ class JobsHandler(TabsHandler):
         Selects the job from the <jobs_pool> list, referring to the given index.
         :return: HTML source of the job page.
         """
-        if not LiveControls.jobs_running:
-            sys_logger.debug("Please click the run button in main screen before handling jobs.")
+        from screens.mainscreen import MainScreen
+        if not MainScreen.running:
+            print("Stopped Running")
             return
 
         self.skip_job()
@@ -149,10 +151,25 @@ class JobsHandler(TabsHandler):
         self.page_source = self.__get_job_page_source()
 
         if self.page_source:
+            # Check for code submission and file submission settings
+            from screens.mainscreen import MainScreen
+
             modify_doing_job_page()
             if self.store_job_page_data():
+                # Check for code submission settings
+                if MainScreen.skip_code_submit:
+                    if self.code_submit_req:
+                        self.select_a_job()
+                        return False
+
+                # Check for file submission settings
+                if MainScreen.skip_file_submit:
+                    if self.file_submit_req:
+                        self.select_a_job()
+                        return False
+
                 self.open_req_urls()
-                return True
+                return True     # Job selected
             else:
                 self.select_a_job()
                 return False
@@ -203,13 +220,18 @@ class JobsHandler(TabsHandler):
         :return:
         """
         sys_logger.debug("Opening urls in JI section")
+        soup = BeautifulSoup(self.page_source, 'lxml')
+        steps = [step.text for step in
+                 soup.find('div', {"id": "job-instructions"}).find_all('li')]
+
         ji_str = ""
-        for i in self.get_ji_section():
-            ji_str += i
+        for i in steps:
+            ji_str += f"{i} "
+
         links_http = {link.group(0) for link in RE_HTTP_LINK.finditer(ji_str)}
-        sys_logger.debug(f"Found Http Links: {len(links_http)} from Ji_section")
+        # sys_logger.debug(f"Found Http Links: {len(links_http)} from Ji_section")
         links_no_http = [f"https://{url.group(0).strip()}" for url in RE_NO_HTTP_LINK.finditer(ji_str)]
-        sys_logger.debug(f"Found Non-Http Links: {len(links_no_http)} from Ji_section")
+        # sys_logger.debug(f"Found Non-Http Links: {len(links_no_http)} from Ji_section")
         if (len(links_http) >= 8) or (len(links_no_http) >= 8):
             sys_logger.debug("Too many urls found. Not opening anything.")
             return True
@@ -298,20 +320,23 @@ class JobsHandler(TabsHandler):
             if not ins_item:
                 ins_item = InstructionItem(job_id=job.id, text=i)
             job.instruction_items.append(ins_item)
+        session.commit()
 
         # One submission item can only be owned by one Job.
         for i in ap_section:
             job.submission_items.append(
                 SubmissionItem(job_id=job.id, text=ap_section[i], field_id=i))
+        session.commit()
 
         self.set_current_job_obj(job)
         self.current_job_payment = self.get_current_job_payment()
-        sys_logger.debug("Successfully stored current job page data.")
+        print("Successfully stored current job page data.")
         return True
 
     @classmethod
     def set_current_job_obj(cls, job):
         cls.current_job_obj = job
+        print("New Job Set: ", job)
 
     def skip_job(self):
         """
@@ -321,6 +346,13 @@ class JobsHandler(TabsHandler):
         if not LiveControls.driver:
             return
 
+        # try to close the job update window, if opened
+        try:
+            from screens.mainscreen import MainScreen
+            MainScreen.job_update_dialog.close()
+        except:
+            pass
+
         # If the current job is skipping without any choices
         # for the submission fields, that means the job is skipping
         # without submitting. Those jobs should be deleted because,
@@ -329,8 +361,8 @@ class JobsHandler(TabsHandler):
         # errors because job_id is unique. To prevent this, when skipping a job,
         # if it doesn't have any choices, delete it
         choices_ok = True
-        if self.current_job_id:
-            for sub in self.current_job_obj.submission_fields:
+        if JobsHandler.current_job_obj:
+            for sub in JobsHandler.current_job_obj.submission_items:
                 # Even if one submission field does not have choices, do not select
                 if not len(sub.choices) > 0:
                     choices_ok = False
@@ -340,7 +372,7 @@ class JobsHandler(TabsHandler):
                 session.commit()
 
         self.page_source = None
-        self.current_job_obj = None
+        self.set_current_job_obj(None)
         self.current_job_id = None
         self.current_job_payment = None
 
@@ -348,12 +380,9 @@ class JobsHandler(TabsHandler):
         self.close_doing_job_tab()
         LiveControls.set_default()
 
-        self.clear_submission_widgets()
-
         wh = MainScreenWidgetsHandler()
         wh.clear_blog_url_field()  # Clear all url input field
-        wh.but_miner_submit_set_default()
-        wh.but_miner_submit_set_default()
+        wh.but_go()
         logger.info("Job skipped.")
         sys_logger.info("Job skipped\n\n")
 
@@ -384,12 +413,6 @@ class JobsHandler(TabsHandler):
             session.add(
                 Earnings(date=today, tasks=1, usd=self.current_job_payment))
 
-    @staticmethod
-    def clear_submission_widgets():
-        LiveControls.submission_widgets.clear()  # clear the dict
-        main_screen_wh = MainScreenWidgetsHandler()
-        main_screen_wh.clear_submission_widgets()   # remove the widgets from scroll area
-
     def hide_job(self):
         """
         Hide the current active job, clicking the "Hide this job"
@@ -410,7 +433,6 @@ class JobsHandler(TabsHandler):
 
             self.close_active_tab()
             self.close_junk_tabs()
-            self.clear_submission_widgets()
             logger.info('Job Hiding Successful.')
             sys_logger.info('Job Hiding Successful.')
         except (NoSuchElementException,
@@ -418,3 +440,22 @@ class JobsHandler(TabsHandler):
                 NoSuchWindowException):
             logger.warning("Job hiding failed.")
             pass
+
+    @property
+    def code_submit_req(self):
+        """
+        Check for code submission
+        :return:
+        """
+        for label in self.get_ap_section():
+            match = [match for match in RE_CODE_SUBMIT.finditer(label)]
+            if match:
+                sys_logger.debug(f"Code submission detected")
+                return True
+        return False
+
+    @property
+    def file_submit_req(self):
+        for sub_item in self.current_job_obj.submission_items:
+            if str(sub_item.field_id).startswith('file'):
+                return True

@@ -183,7 +183,6 @@ def modify_doing_job_page():
     Apply all the modifications for doing job page executing Js.
     :return:
     """
-    js_file = open("js/job-page.js").read()
     driver = get_driver()
-    driver.execute_script(js_file)
+    driver.execute_script(open("js/job-page.js").read())
     logger.debug("Page Modified.")

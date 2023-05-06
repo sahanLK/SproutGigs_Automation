@@ -14,15 +14,13 @@ from tabshandler import TabsHandler
 from qtdesigner.main_screen import Ui_MainScreen
 from qtdesigner.dialogconfirm import Ui_confirm_dialog
 from PyQt5.QtWidgets import QWidget
-from qtdesigner.widgets.widget_submission import Ui_submit_widget
 from qtdesigner.widgets.widget_job_update import Ui_job_update_widget
 from regexes import RE_HTTP_LINK
 from keyfunctions import KeyFunctions
 from PyQt5.QtCore import pyqtSignal, QThreadPool
 import pathlib
-from ai import Ai, BooleanCheck
-from widgetshandler import MainScreenWidgetsHandler
-from database import get_session, SubmissionItemChoice
+from ai import BooleanCheck
+from database import get_session, SubmissionItemChoice, SubmissionItem
 from database import Job
 
 base_dir = pathlib.Path(__file__).parent.parent.absolute()
@@ -35,29 +33,20 @@ tabs_handler = TabsHandler()
 session = get_session()
 
 
-class SubmissionWidget(QWidget):
-    def __init__(self, identity, lbl: str):
-        super(SubmissionWidget, self).__init__()
-        self.id = identity
-        self.label = lbl
-
-        self.widget = Ui_submit_widget()
-        self.widget.setupUi(self)
-        self.widget.lbl.setText(self.label)
-
-        self.widget.but_bl.clicked.connect(lambda: Kf.submit_blog_link(self.id))
-        self.widget.but_pt.clicked.connect(lambda: Kf.submit_post_title(self.id))
-        self.widget.but_lw.clicked.connect(lambda: Kf.submit_last_word(self.id))
-        self.widget.but_ls.clicked.connect(lambda: Kf.submit_last_sentence(self.id))
-        self.widget.but_lp.clicked.connect(lambda: Kf.submit_last_paragraph(self.id))
-        self.widget.but_af.clicked.connect(lambda: Kf.submit_ad_first(self.id))
-        self.widget.but_aa.clicked.connect(lambda: Kf.submit_ad_about(self.id))
-        self.widget.but_ac.clicked.connect(lambda: Kf.submit_ad_contact(self.id))
-        self.widget.but_al.clicked.connect(lambda: Kf.submit_ad_inside(self.id))
-        self.widget.but_clear.clicked.connect(lambda: Kf.clear_textarea(self.id))
-
-
 class JobUpdateWidget(QWidget):
+    """
+    This widget is used for updating the job details into database
+    with clean and 100% accurate details.
+
+    BUT SUBMIT WIDGETS ARE USED TO SUBMIT THE PROOF DIRECTLY INTO WEBPAGE FIELDS.
+    """
+
+    """
+    A set of all the submitted values into webpage.
+    Will be accessed across all the instances.
+    """
+    cache = set()
+
     def __init__(self, sub_item, blog_data, ad_data, *args, **kwargs):
         super(JobUpdateWidget, self).__init__(*args, **kwargs)
         self.widget = Ui_job_update_widget()
@@ -95,95 +84,162 @@ class JobUpdateWidget(QWidget):
             self.widget.choice_5,
         ]
 
-        # 5 clear buttons
-        self.widget.clear_choice_1.clicked.connect(lambda: self.widget.choice_1.clear())
-        self.widget.clear_choice_2.clicked.connect(lambda: self.widget.choice_2.clear())
-        self.widget.clear_choice_3.clicked.connect(lambda: self.widget.choice_3.clear())
-        self.widget.clear_choice_4.clicked.connect(lambda: self.widget.choice_4.clear())
-        self.widget.clear_choice_5.clicked.connect(lambda: self.widget.choice_5.clear())
+        # 5 clear buttons that clear update dialog fields
+        self.widget.clear_choice_1.clicked.connect(self.widget.choice_1.clear)
+        self.widget.clear_choice_2.clicked.connect(self.widget.choice_2.clear)
+        self.widget.clear_choice_3.clicked.connect(self.widget.choice_3.clear)
+        self.widget.clear_choice_4.clicked.connect(self.widget.choice_4.clear)
+        self.widget.clear_choice_5.clicked.connect(self.widget.choice_5.clear)
 
-    def get_first_empty(self):
-        """
-        Gets the first empty choice field from 5 choice fields.
-        :return:
-        """
-        for f in self.fields:
-            if not f.text():
-                return f
+        # Submit button actions (Direct submission to webpage)
+        self.widget.sub_choice_1.clicked.connect(
+            lambda: self.submit_choice(self.widget.choice_1.toPlainText()))
+        self.widget.sub_choice_2.clicked.connect(
+            lambda: self.submit_choice(self.widget.choice_2.toPlainText()))
+        self.widget.sub_choice_3.clicked.connect(
+            lambda: self.submit_choice(self.widget.choice_3.toPlainText()))
+        self.widget.sub_choice_4.clicked.connect(
+            lambda: self.submit_choice(self.widget.choice_4.toPlainText()))
+        self.widget.sub_choice_5.clicked.connect(
+            lambda: self.submit_choice(self.widget.choice_5.toPlainText()))
 
-    def already_filled(self, item):
+    @classmethod
+    def clear_cache(cls):
+        cls.cache.clear()
+
+    @classmethod
+    def add_to_cache(cls, val):
+        cls.cache.add(val)
+
+    @staticmethod
+    def fill_to_page(field_id, val):
         """
-        Check if the given item is already filled into another choice field or not.
+        Submit the given value into the textarea by using given id
         """
-        for f in self.fields:
-            if f.text() == item:
-                return True
+        driver = get_driver()
+        try:
+            driver.execute_script(
+                open(f"{base_dir}/js/choice_submit.js").read(), field_id, val)
+        except Exception as e:
+            logger.info(f"Error when submitting: {e}")
+
+    def submit_choice(self, val):
+        """
+        Submit directly to the webpage.
+        :type val: Value of the relatted choice field
+        """
+        sub_item_text = self.widget.item_text.text()
+        field_id = self.get_field_id(sub_item_text)
+        jh.go_to_doing_job_tab()
+        if val not in self.cache:
+            self.fill_to_page(field_id, val)
+        self.add_to_cache(val)
+
+    """
+    The methods that update the input fields in update window
+    """
 
     def ad_first(self):
         field = self.get_first_empty()
         if field:
             if not self.already_filled(self.ad_data.first_url):
-                field.setText(self.ad_data.first_url)
+                field.setPlainText(self.ad_data.first_url)
 
     def last_sentence(self):
         field = self.get_first_empty()
         if field:
             for item in self.blog_data.last_sentences:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
 
     def ad_link(self):
         field = self.get_first_empty()
         if field:
             for item in self.ad_data.links:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
 
     def last_paragraph(self):
         field = self.get_first_empty()
         if field:
             for item in self.blog_data.last_paragraphs:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
 
     def post_title(self):
         field = self.get_first_empty()
         if field:
             for item in self.blog_data.titles:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
 
     def ad_about(self):
         field = self.get_first_empty()
         if field:
             if not self.already_filled(self.ad_data.about_url):
-                field.setText(self.ad_data.about_url)
+                field.setPlainText(self.ad_data.about_url)
 
     def ad_contact(self):
         field = self.get_first_empty()
         if field:
             if not self.already_filled(self.ad_data.contact_url):
-                field.setText(self.ad_data.contact_url)
+                field.setPlainText(self.ad_data.contact_url)
 
     def post_link(self):
         field = self.get_first_empty()
         if field:
             for item in self.blog_data.posts:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
 
     def last_word(self):
         field = self.get_first_empty()
         if field:
             for item in self.blog_data.last_words:
-                if not self.already_filled(item):
-                    field.setText(item)
+                if not self.already_filled(item)\
+                        and item not in self.cache:
+                    field.setPlainText(item)
                     break
+
+    def already_filled(self, item):
+        """
+        Check if the given item is already filled into another choice field or not.
+        """
+        for f in self.fields:
+            if f.toPlainText() == item:
+                return True
+
+    """
+    HELPERS
+    """
+
+    def get_field_id(self, label):
+        """
+        Return the submission field id by using given <SubmissionItem> text.
+        :type label: string of the <JobUpdateWidget> submission_item text.
+        """
+        for i in self.job.submission_items:
+            i: SubmissionItem
+            if i.text == label:
+                return str(i.field_id)
+
+    def get_first_empty(self):
+        """
+        Gets the first empty choice field from 5 choice fields.
+        """
+        for f in self.fields:
+            if not f.toPlainText():
+                return f
 
 
 class MainScreen(QMainWindow, Ui_MainScreen):
@@ -201,13 +257,33 @@ class MainScreen(QMainWindow, Ui_MainScreen):
     """
     sig_job_update = pyqtSignal()
 
+    """
+    Job update dialog window. This is used in <jobsHandler>
+    to close the dialog when skipping the job 
+    """
+    job_update_dialog = None
+
+    """
+    Setting: Skip Code Submission jobs
+    """
+    skip_code_submit = True
+
+    """
+    Setting: Skip Code Submission jobs
+    """
+    skip_file_submit = True
+
+    """
+    Programme running state
+    """
+    running = False
+
     def __init__(self):
         super(MainScreen, self).__init__()
         self.blog_data = None
         self.ad_data = None
         self.threadpool = QThreadPool()
 
-        self.running = False
         self.driver = None
         self.setupUi(self)
 
@@ -217,30 +293,37 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         self.actionExit.triggered.connect(self.exit)
         self.actionDeveloper.triggered.connect(self.show_developer_info)
 
-        # Toolbar Actions
-        run_action = QAction(QIcon('./icons/run-fast.png'), '', self)
-        run_action.triggered.connect(self.start_or_stop)
-        run_action.setCheckable(True)
-
         autopilot_action = QAction(QIcon('./icons/bot.png'), '', self)
         autopilot_action.triggered.connect(self.activate_auto_pilot)
         autopilot_action.setCheckable(True)
 
         # Adding actions into toolbar
         self.toolBar.addAction(autopilot_action)
-        self.toolBar.addAction(run_action)
 
         # Defining button actions
-        self.but_miner_submit.clicked.connect(self._thread_miner_submit)
+        self.but_go.clicked.connect(self._thread_miner_submit)
         self.but_skip.clicked.connect(self.job_skip)
         self.but_hide.clicked.connect(self.job_hide)
+        self.but_run.clicked.connect(self.start_or_stop)
 
         # Slots for custom signals
-        self.sig_update_widgets.connect(self.scroll_submit_widgets_update)
         self.sig_job_update.connect(self.open_job_update_window)
 
-        # ScrollArea
-        self.scroll_submit_widgets.setWidgetResizable(True)
+    @classmethod
+    def select_code_sub(cls,):
+        cls.skip_code_submit = False
+
+    @classmethod
+    def select_file_sub(cls):
+        cls.skip_file_submit = False
+
+    @classmethod
+    def set_running_stat(cls):
+        """
+        Toggle the state of running state of the jobs.
+        This should be called whenever the <start_or_stop> func is called.
+        """
+        cls.running = False if cls.running else True
 
     def start_or_stop(self, *args):
         """
@@ -248,35 +331,32 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         :param args:
         :return:
         """
+        self.set_running_stat()
+
         if self.running:
-            self.running = False
-            self.stop_running()
-        else:
-            self.running = True
+            # Set run button text and color normal
+            self.but_run.setText("STOP")
+
+            # Set job selection settings
+            if not self.skip_code_sub.isChecked():
+                self.select_code_sub()
+            if not self.skip_file_sub.isChecked():
+                self.select_file_sub()
+
             driver = get_driver()
             if driver:
                 jh.update_jobs()
-                LiveControls.jobs_running = True
                 t = threading.Thread(target=self.start_running)
                 t.start()
+        else:
+            # Stopping running
+            # Set run button text and color
+            self.but_run.setText("RUN")
 
     def start_running(self, *args):
-        sys_logger.info("Started running")
-        logger.info('started running')
+        print("Running")
         self.driver = get_driver()
         jh.select_a_job()
-
-    def scroll_submit_widgets_update(self):
-        """
-        Update the scroll area of submission widgets.
-        :return:
-        """
-        vbox = QVBoxLayout()
-        widget = QWidget()
-        for identity, lbl in LiveControls.submission_widgets.items():
-            vbox.addWidget(SubmissionWidget(identity=identity, lbl=lbl))
-        widget.setLayout(vbox)
-        self.scroll_submit_widgets.setWidget(widget)
 
     @classmethod
     def emit_submit_widget_update_signal(cls, instance):
@@ -310,8 +390,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             sys_logger.debug("Blog url is empty or invalid. returning")
             return
         sys_logger.debug(f"MINER_SUBMIT: initiated with {url}")
-        self.but_miner_submit.setText("Submitting..")
-        self.but_miner_submit.setEnabled(False)
+        self.but_go.setEnabled(False)
 
         job = JobsHandler.current_job_obj
         if not job:
@@ -331,9 +410,11 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         self.sig_job_update.emit()
 
     def open_job_update_window(self):
-        self.but_miner_submit.setEnabled(True)
+        self.but_go.setEnabled(True)
 
-        self.d = QDialog(parent=self)
+        self.job_update_dialog = QDialog(parent=self)
+        self.set_update_dialog_universal(self.job_update_dialog)
+
         widget_layout = QVBoxLayout()
         widget_layout.setSpacing(0)
 
@@ -342,6 +423,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         # All the update widgets
         widgets = []
 
+        # for sub_item in job.submission_items:
         for sub_item in job.submission_items:
             item = JobUpdateWidget(
                 sub_item=sub_item,
@@ -367,41 +449,60 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         save_btn.setFixedHeight(50)
         save_btn.clicked.connect(
             lambda: self.save_and_submit(widgets))
+
+        clr_cache_btn = QPushButton("Clear Cache")
+        clr_cache_btn.setFont(QFont('Times', 10))
+        clr_cache_btn.setFixedHeight(50)
+        clr_cache_btn.clicked.connect(JobUpdateWidget.clear_cache)
+
         main_layout.addWidget(save_btn)
-        self.d.setLayout(main_layout)
-        self.d.exec()
+        main_layout.addWidget(clr_cache_btn)
+
+        self.job_update_dialog.setLayout(main_layout)
+        self.job_update_dialog.exec()
+
+    @classmethod
+    def set_update_dialog_universal(cls, dialog):
+        """
+        For accessing from other classes
+        """
+        cls.job_update_dialog = dialog
 
     def save_and_submit(self, widgets):
-        def get_choices(sub_text):
-            """
-            Returns the choices according to the given
-            <SubmissionItem> text.
-            """
-            for w in widgets:
-                w: JobUpdateWidget = w
-                if w.widget.item_text.text() == sub_text:
-                    # Found the related submission item
-                    rel_choices = []
-                    for i in w.fields:
-                        rel_choices.append(i.text())
-                    return rel_choices
+        def _thread():
+            def get_choices(sub_text):
+                """
+                Returns the choices according to the given
+                <SubmissionItem> text.
+                """
+                for w in widgets:
+                    w: JobUpdateWidget = w
+                    if w.widget.item_text.text() == sub_text:
+                        # Found the related submission item
+                        rel_choices = []
+                        for i in w.fields:
+                            rel_choices.append(i.toPlainText())
+                        return rel_choices
 
-        job = JobsHandler.current_job_obj
-        for sub_item in job.submission_items:
-            # get the choices for this submission item
-            choices = get_choices(sub_item.text)
+            job = JobsHandler.current_job_obj
+            for sub_item in job.submission_items:
+                # get the choices for this submission item
+                choices = get_choices(sub_item.text)
 
-            for ch in choices:
-                obj = SubmissionItemChoice(text=ch)
+                for ch in choices:
+                    obj = SubmissionItemChoice(text=ch)
 
-                # Add to the choices of current <SubmissionItem>
-                sub_item.choices.append(obj)
+                    # Add to the choices of current <SubmissionItem>
+                    sub_item.choices.append(obj)
+
+        t = threading.Thread(target=_thread)
+        t.start()
+        t.join()
 
         self.submit()
-        self.d.close()
+        self.job_update_dialog.close()
 
-    @staticmethod
-    def submit():
+    def submit(self):
         """
         Submit the proofs into the actual webpage
         """
@@ -409,7 +510,6 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         job = JobsHandler.current_job_obj
 
         for sub_item in job.submission_items:
-            print(sub_item.text, "-> ", sub_item.field_id)
             # skip file submissions
             if str(sub_item.field_id).lower().startswith('file'):
                 continue
@@ -420,7 +520,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             driver.execute_script(f"$('#{sub_item.field_id}').val('{choice.text}');")
 
         # Enable the button again
-        MainScreenWidgetsHandler().but_miner_submit_set_default()
+        self.but_go.setEnabled(True)
 
     def show_developer_info(self):
         d = QDialog()
@@ -488,13 +588,10 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             #
             # # All good submit the job
             # driver.execute_script("$('#submit-proof-btn').click();")
-            #
+
             # # wait more than a monite before next job
             print("Waiting more than a minute")
             time.sleep(60 + random.randint(2, 10))
-
-    def stop_running(self, *args):
-        self.running = False
 
     def job_skip(self):
         """

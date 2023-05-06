@@ -24,34 +24,6 @@ AD_INSIDE_ILLEGALS = re.compile(r'(sentences?|about us|contact us)', flags=re.I)
 
 class BooleanCheck:
 
-    """
-    Check for the existence of something.
-    """
-    @staticmethod
-    def history_snapshot_req() -> bool:
-        """
-        Check for history page screenshot.
-        :return:
-        """
-        for label in get_ap_section():
-            match = [match for match in RE_SNAPSHOT.finditer(label)]
-            if match:
-                return True
-        return False
-
-    @staticmethod
-    def code_submit_req(ap_section):
-        """
-        Check for code submission
-        :return:
-        """
-        for label in ap_section:
-            match = [match for match in RE_CODE_SUBMIT.finditer(label)]
-            if match:
-                sys_logger.debug(f"Code submission detected")
-                return True
-        return False
-
     @staticmethod
     def titles_req(ap_section):
         """

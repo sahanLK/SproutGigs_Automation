@@ -6,20 +6,20 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>986</width>
-    <height>380</height>
+    <width>1012</width>
+    <height>538</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>0</width>
-    <height>380</height>
+    <height>538</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>16777215</width>
-    <height>380</height>
+    <height>538</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -43,7 +43,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_6">
          <item>
-          <widget class="QPushButton" name="but_af">
+          <widget class="QPushButton" name="but_bl">
            <property name="minimumSize">
             <size>
              <width>35</width>
@@ -57,12 +57,12 @@
             </size>
            </property>
            <property name="text">
-            <string>AF</string>
+            <string>BL</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="but_ls">
+          <widget class="QPushButton" name="but_pt">
            <property name="minimumSize">
             <size>
              <width>35</width>
@@ -76,26 +76,7 @@
             </size>
            </property>
            <property name="text">
-            <string>LS</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="but_al">
-           <property name="minimumSize">
-            <size>
-             <width>35</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>AL</string>
+            <string>PT</string>
            </property>
           </widget>
          </item>
@@ -119,7 +100,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="but_pt">
+          <widget class="QPushButton" name="but_ls">
            <property name="minimumSize">
             <size>
              <width>35</width>
@@ -133,7 +114,45 @@
             </size>
            </property>
            <property name="text">
-            <string>PT</string>
+            <string>LS</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="but_lw">
+           <property name="minimumSize">
+            <size>
+             <width>35</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>LW</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="but_af">
+           <property name="minimumSize">
+            <size>
+             <width>35</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>40</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>AF</string>
            </property>
           </widget>
          </item>
@@ -176,7 +195,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="but_bl">
+          <widget class="QPushButton" name="but_al">
            <property name="minimumSize">
             <size>
              <width>35</width>
@@ -190,26 +209,7 @@
             </size>
            </property>
            <property name="text">
-            <string>BL</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="but_lw">
-           <property name="minimumSize">
-            <size>
-             <width>35</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string>LW</string>
+            <string>AL</string>
            </property>
           </widget>
          </item>
@@ -222,24 +222,11 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
-          <widget class="QLineEdit" name="choice_1">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>40</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clear_choice_1">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
@@ -254,21 +241,47 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_3">
+          <widget class="QPlainTextEdit" name="choice_1">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>10</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="plainText">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="sub_choice_1">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
-            <string>Copy</string>
+            <string>Submit</string>
            </property>
           </widget>
          </item>
@@ -277,27 +290,17 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
-          <widget class="QLineEdit" name="choice_2">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>40</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clear_choice_2">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
@@ -306,21 +309,47 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_4">
+          <widget class="QPlainTextEdit" name="choice_2">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>10</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="plainText">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="sub_choice_2">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
-            <string>Copy</string>
+            <string>Submit</string>
            </property>
           </widget>
          </item>
@@ -329,27 +358,17 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
-          <widget class="QLineEdit" name="choice_3">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>40</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clear_choice_3">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
@@ -358,21 +377,44 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_6">
+          <widget class="QPlainTextEdit" name="choice_3">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>10</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="sub_choice_3">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
-            <string>Copy</string>
+            <string>Submit</string>
            </property>
           </widget>
          </item>
@@ -381,27 +423,17 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
          <item>
-          <widget class="QLineEdit" name="choice_4">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>40</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clear_choice_4">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
@@ -410,21 +442,44 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_8">
+          <widget class="QPlainTextEdit" name="choice_4">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>10</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="sub_choice_4">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
-            <string>Copy</string>
+            <string>Submit</string>
            </property>
           </widget>
          </item>
@@ -433,27 +488,17 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
-          <widget class="QLineEdit" name="choice_5">
-           <property name="minimumSize">
-            <size>
-             <width>0</width>
-             <height>40</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QPushButton" name="clear_choice_5">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
@@ -462,21 +507,44 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_10">
+          <widget class="QPlainTextEdit" name="choice_5">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>10</pointsize>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="sub_choice_5">
            <property name="minimumSize">
             <size>
              <width>60</width>
-             <height>40</height>
+             <height>60</height>
             </size>
            </property>
            <property name="maximumSize">
             <size>
              <width>60</width>
-             <height>16777215</height>
+             <height>60</height>
             </size>
            </property>
            <property name="text">
-            <string>Copy</string>
+            <string>Submit</string>
            </property>
           </widget>
          </item>

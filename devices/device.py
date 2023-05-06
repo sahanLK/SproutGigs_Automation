@@ -369,6 +369,7 @@ class _Configs:
         options.add_experimental_option('prefs', {'intl.accept_languages': self.language})
         options.add_experimental_option('useAutomationExtension', False)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("excludeSwitches", ["enable-logging"])
 
         # Browser specific options
         options.use_chromium = True  # For edge only

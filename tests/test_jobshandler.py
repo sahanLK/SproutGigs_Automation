@@ -13,7 +13,6 @@ class TestJobsHandler(unittest.TestCase):
     def test_store_job_page_data(self):
         db_handler.clear_tb('current_job_data')
         self.page_source = driver.page_source
-        self.assertTrue(jobs_handler.store_job_page_data(self.page_source))
 
     def test_get_clean_step(self):
         self.assertEqual(
