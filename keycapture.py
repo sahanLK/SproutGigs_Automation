@@ -56,33 +56,6 @@ def key_listener():
                     snap_history()
                 elif pressed == 'Key.f9':
                     Kf.clear_textarea()
-                elif pressed == '1':
-                    _press_backspace()
-                    Kf.submit_blog_link()
-                elif pressed == '2':
-                    _press_backspace()
-                    Kf.submit_post_title()
-                elif pressed == '3':
-                    _press_backspace()
-                    Kf.submit_last_word()
-                elif pressed == '4':
-                    _press_backspace()
-                    Kf.submit_last_sentence()
-                elif pressed == '5':
-                    _press_backspace()
-                    Kf.submit_last_paragraph()
-                elif pressed == '6':
-                    _press_backspace()
-                    Kf.submit_ad_first()
-                elif pressed == '7':
-                    _press_backspace()
-                    Kf.submit_ad_inside()
-                elif pressed == '8':
-                    _press_backspace()
-                    Kf.submit_ad_about()
-                elif pressed == '9':
-                    _press_backspace()
-                    Kf.submit_ad_contact()
                 elif pressed == '0':
                     _press_backspace()
                     Kf.hide_job()

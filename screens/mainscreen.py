@@ -47,6 +47,13 @@ class JobUpdateWidget(QWidget):
     """
     cache = set()
 
+    """
+    All the <JobUpdateWidget> instances created for current active job.
+    This set will be used to prevent filling same item twice into update
+    window fields.
+    """
+    instances = set()
+
     def __init__(self, sub_item, blog_data, ad_data, *args, **kwargs):
         super(JobUpdateWidget, self).__init__(*args, **kwargs)
         self.widget = Ui_job_update_widget()
@@ -102,6 +109,14 @@ class JobUpdateWidget(QWidget):
             lambda: self.submit_choice(self.widget.choice_4.toPlainText()))
         self.widget.sub_choice_5.clicked.connect(
             lambda: self.submit_choice(self.widget.choice_5.toPlainText()))
+
+    @classmethod
+    def add_to_instances(cls, item):
+        cls.instances.add(item)
+
+    @classmethod
+    def clear_instances(cls):
+        cls.instances.clear()
 
     @classmethod
     def clear_cache(cls):
@@ -213,11 +228,16 @@ class JobUpdateWidget(QWidget):
 
     def already_filled(self, item):
         """
-        Check if the given item is already filled into another choice field or not.
+        This method checks if the item given is available in any other field.
+        This not only check in the current instance, but also checks all the
+        other instances created with this class.
         """
-        for f in self.fields:
-            if f.toPlainText() == item:
-                return True
+        for instance in self.instances:
+            instance: JobUpdateWidget
+
+            for field in instance.fields:
+                if field.toPlainText() == item:
+                    return True
 
     """
     HELPERS
@@ -423,6 +443,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         # All the update widgets
         widgets = []
 
+        JobUpdateWidget.clear_instances()
         # for sub_item in job.submission_items:
         for sub_item in job.submission_items:
             item = JobUpdateWidget(
@@ -430,6 +451,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
                 blog_data=self.blog_data,
                 ad_data=self.ad_data,
             )
+            JobUpdateWidget.add_to_instances(item)
             widget_layout.addWidget(item)
             widgets.append(item)
 
@@ -469,11 +491,17 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         cls.job_update_dialog = dialog
 
     def save_and_submit(self, widgets):
+        """
+        :param widgets: All the <JobUpdateWidget> for current job
+        :return:
+        """
+
         def _thread():
             def get_choices(sub_text):
                 """
                 Returns the choices according to the given
-                <SubmissionItem> text.
+                <SubmissionItem> text. These choices are taken
+                from update window fields
                 """
                 for w in widgets:
                     w: JobUpdateWidget = w
@@ -481,7 +509,13 @@ class MainScreen(QMainWindow, Ui_MainScreen):
                         # Found the related submission item
                         rel_choices = []
                         for i in w.fields:
-                            rel_choices.append(i.toPlainText())
+                            choice_txt = i.toPlainText().strip()
+
+                            # skip empty choice fields
+                            if not choice_txt:
+                                continue
+
+                            rel_choices.append(choice_txt)
                         return rel_choices
 
             job = JobsHandler.current_job_obj
@@ -495,18 +529,17 @@ class MainScreen(QMainWindow, Ui_MainScreen):
                     # Add to the choices of current <SubmissionItem>
                     sub_item.choices.append(obj)
 
-        t = threading.Thread(target=_thread)
-        t.start()
-        t.join()
+            # Database operations complete. Now submit
+            self.submit()
+            self.job_update_dialog.close()
 
-        self.submit()
-        self.job_update_dialog.close()
+        t = threading.Thread(target=_thread, daemon=True)
+        t.start()
 
     def submit(self):
         """
         Submit the proofs into the actual webpage
         """
-        driver = get_driver()
         job = JobsHandler.current_job_obj
 
         for sub_item in job.submission_items:
@@ -517,7 +550,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
             # Fill the box
             choice = random.choice(list(sub_item.choices))
             tabs_handler.go_to_doing_job_tab()
-            driver.execute_script(f"$('#{sub_item.field_id}').val('{choice.text}');")
+            JobUpdateWidget.fill_to_page(sub_item.field_id, choice.text)
 
         # Enable the button again
         self.but_go.setEnabled(True)
@@ -538,7 +571,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
     def activate_auto_pilot():
         """
         Fully safe 100% automated action that select and submit tasks automatically
-        using the previously submitted tasks
+        using the previously submitted tasks.
         """
         driver = get_driver()
 
@@ -546,7 +579,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         jobs = set()
         for job in session.query(Job).all():
             choices_ok = True
-            for sub in job.submission_fields:
+            for sub in job.submission_items:
                 # Even if one submission field does not have choices, do not select
                 if not len(sub.choices) > 0:
                     choices_ok = False
