@@ -51,7 +51,7 @@ class BlogSite(Base):
     domain = Column(String(255))
 
     jobs = relationship("Job", back_populates="blog")
-    posts = relationship('BlogPost', back_populates="blog")
+    posts = relationship('BlogPost', back_populates="blog", cascade="all,delete")
     ad_sites = relationship("AdSite", secondary="link_blog_site_ad_site")
 
     def __repr__(self):
@@ -70,8 +70,11 @@ class Job(Base):
     instruction_items = relationship(
         "InstructionItem",
         secondary="link_job_instruction_item",
-        back_populates="jobs")
-    submission_items = relationship("SubmissionItem", back_populates="job")
+        back_populates="jobs", cascade="all,delete")
+    submission_items = relationship(
+        "SubmissionItem",
+        back_populates="job",
+        cascade="all,delete")
 
     def __repr__(self):
         return f"<Job: {self.job_id}>"
@@ -101,7 +104,7 @@ class AdSite(Base):
     adsense_url = Column(String(1000))
     first_url = Column(String(1000))
 
-    pages = relationship("AdPage", back_populates="ad_site")
+    pages = relationship("AdPage", back_populates="ad_site", cascade="all,delete")
     blog_sites = relationship(
         "BlogSite",
         secondary="link_blog_site_ad_site",
@@ -142,7 +145,10 @@ class SubmissionItem(Base):
     submitted_value = Column(String(1000))
 
     job = relationship("Job", back_populates="submission_items")
-    choices = relationship("SubmissionItemChoice", back_populates="sub_item")
+    choices = relationship(
+        "SubmissionItemChoice",
+        back_populates="sub_item",
+        cascade="all,delete")
 
     def __repr__(self):
         return f"<SubmissionItem: {self.text}>"

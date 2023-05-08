@@ -45,9 +45,10 @@ class TabsHandler:
                     return True
             logger.warning("Failed To Switch: Doing Job Tab")
 
-    def close_doing_job_tab(self):
-        self.go_to_doing_job_tab()
-        self.close_active_tab()
+    @staticmethod
+    def close_doing_job_tab():
+        TabsHandler.go_to_doing_job_tab()
+        TabsHandler.close_active_tab()
 
     @staticmethod
     def go_to_jobs_tab():
@@ -69,6 +70,16 @@ class TabsHandler:
                     logger.info("Switched To: Jobs Tab")
                     return True
             logger.warning("Failed To Switch: Jobs Tab")
+
+    @staticmethod
+    def get_jobs_page_source():
+        """
+        Returns the page source of Jobs tab
+        :return:
+        """
+        driver = get_driver()
+        TabsHandler.go_to_jobs_tab()
+        return driver.page_source
 
     @staticmethod
     def switch_to_tab_by_url(url: str):
@@ -112,7 +123,7 @@ class TabsHandler:
             pass
 
     @staticmethod
-    def close_junk_tabs():
+    def close_junk():
         """
         Close all the tabs except ne
         :return:

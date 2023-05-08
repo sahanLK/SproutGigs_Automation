@@ -14,7 +14,6 @@ from pynput.keyboard import Listener, Controller, Key
 
 from functions.fns import get_syslogger
 from keyfunctions import KeyFunctions
-from functions.driverfns import snap_history
 
 Kf = KeyFunctions()
 Kc = Controller()
@@ -52,8 +51,8 @@ def key_listener():
                     Kf.modify_page()
                 elif pressed == 'Key.f4':
                     Kf.stop_snapshot_process()
-                elif pressed == 'Key.f8':
-                    snap_history()
+                # elif pressed == 'Key.f8':
+                #     snap_history()
                 elif pressed == 'Key.f9':
                     Kf.clear_textarea()
                 elif pressed == '0':

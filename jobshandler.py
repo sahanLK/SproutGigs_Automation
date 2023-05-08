@@ -2,23 +2,36 @@ import re
 import time
 import logging
 from datetime import datetime
-
-from ai import BooleanCheck
-from functions.fns import str_cleaner, get_file_logger, get_syslogger, get_ascii
+from functions.fns import (
+    str_cleaner,
+    get_file_logger,
+    get_syslogger,
+    get_ascii)
 from functions.driverfns import filter_mt, get_driver, modify_doing_job_page
 from livecontrols import LiveControls
-from constants import DOING_JOB_PAGE_INITIALS, HIDE_JOB_CLSNAME, JOB_TITLE_CLASS, JOB_PAYMENT_CLASS
+from constants import (
+    DOING_JOB_PAGE_INITIALS,
+    HIDE_JOB_CLSNAME,
+    JOB_TITLE_CLASS,
+    JOB_PAYMENT_CLASS)
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from regexes import RE_HTTP_LINK, RE_NO_HTTP_LINK, RE_CODE_SUBMIT
 from tabshandler import TabsHandler
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, NoSuchWindowException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    ElementClickInterceptedException,
+    NoSuchWindowException)
 from widgetshandler import MainScreenWidgetsHandler
 from pathlib import Path
-from database import get_session, InstructionItem, SubmissionItem, Job, Earnings
-from sqlalchemy.sql import and_
-from sqlalchemy.exc import IntegrityError
+from database import (
+    get_session,
+    InstructionItem,
+    SubmissionItem,
+    Job,
+    Earnings)
+from sqlalchemy.exc import IntegrityError, PendingRollbackError
 
 base_dir = Path(__file__).parent.absolute()
 logger = get_file_logger(__file__, logging.DEBUG, f"{base_dir}/logs/jobshandler.log", 'w+')
@@ -27,35 +40,7 @@ sys_logger = get_syslogger()
 session = get_session()
 
 
-def get_no_br_html(html: str):
-    """
-    Replace all the <br> tags from the whole html page. This is done to prevent
-    matching wrong urls form the Ji_section. If this method did not use before
-    storing data into table[current_job_data], wrong and invalid urls will be opened
-    by [JobsHandler.open_req_urls()]
-    :param html:
-    :return:
-    """
-    try:
-        rm_br = re.sub(r"<br>|</br>|<br/>", " ", html)
-        return rm_br
-    except Exception as e:
-        sys_logger.error(f"Error when removing <br> from source: {e}")
-
-
-def get_clean_step(step: str) -> str:
-    """
-    Clean the step given by removing initial number, dot and other spaces that exists at the
-    beginning and the end of the step. This method is used to provide much cleaner text for the
-    Ai module and database storage.
-    :return:
-    """
-    cleaned = re.sub(r'^\d\.\s', '', step)
-    cleaned = re.sub(r'\|', ' ', cleaned)
-    return cleaned.strip('\n :>')
-
-
-class JobsHandler(TabsHandler):
+class JobsHandler:
     """
     Handler for all the job related tasks.
     """
@@ -63,7 +48,7 @@ class JobsHandler(TabsHandler):
     """
     The IDs of the jobs to use for building the job page url.
     """
-    jobs_pool = iter
+    job_ids = set()
 
     """
     The <Job> object of the currently ongoing job.
@@ -79,40 +64,56 @@ class JobsHandler(TabsHandler):
         self.current_job_payment = None
         self.page_source = None  # Cleaned job page source
 
-    def update_jobs(self):
+    @staticmethod
+    def update_jobs():
         """
         Updates the active job list.
         :return:
         """
         sys_logger.info("Updating jobs")
-        self.driver = get_driver()
-        job_ids = []
         skipped = 0
+        TabsHandler.switched_to_any_tab()
         filter_mt()
-        if self.go_to_jobs_tab():
-            soup = BeautifulSoup(str(self.driver.page_source), 'lxml')
+        JobsHandler.clear_job_ids()
+        if TabsHandler.go_to_jobs_tab():
+            soup = BeautifulSoup(
+                str(TabsHandler.get_jobs_page_source()), 'lxml')
             job_bars = soup.find_all('a', {"class": "job-bar"})
             for bar in job_bars:
                 danger = bar.find('div', {"class": "bg-danger"})
                 if not danger:
-                    job_ids.append(bar['data-job-id'])
+                    JobsHandler.add_job_id(bar['data-job-id'])
                     continue
                 skipped += 1
         else:
             logger.error("Failed to update jobs")
-        self.store_job_ids(job_ids)
-        sys_logger.debug(f"Jobs Updated\t\t->\tStored: {len(job_ids)}\t\tSkipped: {skipped} jobs.")
+        sys_logger.debug(
+            f"Stored: {len(JobsHandler.job_ids)}\t\tSkipped: {skipped} jobs.")
 
     @classmethod
-    def store_job_ids(cls, job_ids: list):
-        cls.jobs_pool = iter(job_ids)
+    def add_job_id(cls, job_id):
+        if job_id:
+            cls.job_ids.add(job_id)
 
-    @staticmethod
-    def get_job_url(job_id):
-        """
-        Give me the job id and I will give you the url of the job
-        """
-        return f'{DOING_JOB_PAGE_INITIALS}{job_id}'
+    @classmethod
+    def clear_job_ids(cls):
+        cls.job_ids.clear()
+
+    @classmethod
+    def get_first_job_id(cls):
+        u = list(cls.job_ids)[0]
+        return u
+
+    @classmethod
+    def get_all_job_ids(cls):
+        return cls.job_ids
+
+    @classmethod
+    def remove_job_id(cls, job_id):
+        try:
+            cls.job_ids.remove(job_id)
+        except KeyError:
+            pass
 
     def select_a_job(self):
         """
@@ -121,13 +122,15 @@ class JobsHandler(TabsHandler):
         """
         from screens.mainscreen import MainScreen
         if not MainScreen.running:
-            print("Stopped Running")
             return
 
         self.skip_job()
         sys_logger.info("Selecting a new job")
         try:
-            self.current_job_id = self.jobs_pool.__next__()
+            self.current_job_id = JobsHandler.get_first_job_id()
+            self.remove_job_id(self.current_job_id)
+            if not self.current_job_id:
+                self.update_jobs()
             sys_logger.debug(f"Job ID: {self.current_job_id}")
         except (IndexError, StopIteration):
             self.update_jobs()
@@ -135,12 +138,12 @@ class JobsHandler(TabsHandler):
         except Exception as e:
             sys_logger.critical(f"Unexpected error while getting a Job ID: {e}")
 
-        job_url = self.get_job_url(self.current_job_id)
+        job_url = get_job_url(self.current_job_id)
         driver = get_driver()
         driver.open_url(job_url, target='_blank', force_chk_config=False)
 
         # If the current job has expired, select another job
-        if not self.go_to_doing_job_tab():
+        if not TabsHandler.go_to_doing_job_tab():
             self.select_a_job()
             return False
 
@@ -148,7 +151,7 @@ class JobsHandler(TabsHandler):
 
         # Setting up the current job page source after cleaning properly
         # This should be properly cleaned because, this will be accessed all over this class.
-        self.page_source = self.__get_job_page_source()
+        self.page_source = get_job_page_source()
 
         if self.page_source:
             # Check for code submission and file submission settings
@@ -168,59 +171,21 @@ class JobsHandler(TabsHandler):
                         self.select_a_job()
                         return False
 
-                self.open_req_urls()
+                self.open_req_urls(self.page_source)
                 return True     # Job selected
             else:
                 self.select_a_job()
                 return False
         return False
 
-    @property
-    def already_done(self):
-        """
-        Check if the opened job is already done or not.
-        """
-        # Check if the job already exists with current job title and id
-        job = session.query(Job).filter(
-            and_(
-                Job.title.__eq__(self.job_title),
-                Job.job_id.__eq__(self.current_job_id)))
-
-        if not job:
-            logger.info(f"No job exists with ID({self.current_job_id})"
-                        f" and title({self.job_title})")
-            return False
-
-        # At this point a job has found with current job title and ID.
-        # Noe check if the instruction_items and submission_items are equal or not
-        # If those 2 matched, we found a previously done job
-
-        # Check if no.of items in the comparing lists are equal
-        ji = self.get_ji_section()
-        if not len(ji) == len(job.instruction_items):
-            return False
-
-        ap = self.get_ap_section()
-        if not len(ap) == len(job.submission_items):
-            return False
-
-        # If lengths are equal, check for item equalities
-        for ins_item in ji:
-            if ins_item not in job.instruction_items:
-                return False
-
-        for sub_item in self.get_ap_section():
-            if sub_item not in job.submission_items:
-                return False
-        return True
-
-    def open_req_urls(self):
+    @staticmethod
+    def open_req_urls(page_source):
         """
         Open the urls found in the job info section.
         :return:
         """
         sys_logger.debug("Opening urls in JI section")
-        soup = BeautifulSoup(self.page_source, 'lxml')
+        soup = BeautifulSoup(page_source, 'lxml')
         steps = [step.text for step in
                  soup.find('div', {"id": "job-instructions"}).find_all('li')]
 
@@ -242,59 +207,16 @@ class JobsHandler(TabsHandler):
             driver = get_driver()
             driver.open_url(url, target="_blank")
 
-    def __get_job_page_source(self):
-        try:
-            self.go_to_doing_job_tab()
-            driver = get_driver()
-            if driver.current_url.startswith(DOING_JOB_PAGE_INITIALS):
-                source = driver.page_source
-                cleaned = get_no_br_html(get_ascii(source))
-                sys_logger.debug("Current job page source returned")
-                return cleaned
-        except Exception as e:
-            logger.error(f"Error when getting current job page source: {e}")
-            sys_logger.error(f"Error when getting current job page source: {e}")
-
-    @property
-    def job_title(self):
-        soup = BeautifulSoup(self.page_source, 'lxml')
-        title = soup.select_one(f".{JOB_TITLE_CLASS}").text
-        return str_cleaner(title)
-
-    def get_ji_section(self):
-        soup = BeautifulSoup(self.page_source, 'lxml')
-        steps = [str_cleaner(step.text) for step in
-                 soup.find('div', {"id": "job-instructions"}).find_all('li')]
-        if not steps:
-            logger.warning("Job Info could not be determined.")
-        return steps
-
-    def get_ap_section(self) -> dict:
-        soup = BeautifulSoup(self.page_source, 'lxml')
-        steps = {group.label['for']: get_clean_step(str_cleaner(
-            BeautifulSoup(str(group.label), 'lxml').text))
-            for group in soup.find(
-                'form', {"id": "task-proofs"}).find(
-                'div', {"class": "job-info-list"}).find_all(
-                "div", {'class': 'form-group'}) if group.label}
-
-        if not steps:
-            logger.warning("Actual Proofs could not be determined.")
-        return steps
-
-    def get_current_job_payment(self):
-        soup = BeautifulSoup(self.page_source, 'lxml')
-        price = soup.find('div', {'class': JOB_PAYMENT_CLASS}).find('span').text
-        return float(price)
-
     def store_job_page_data(self):
         """
         Saving job page source and sections appropriately into a jason file.
         """
-        ji_section = self.get_ji_section()
-        ap_section = self.get_ap_section()
+        ji_section = get_ji_section(self.page_source)
+        ap_section = get_ap_section(self.page_source)
 
-        job = Job(job_id=self.current_job_id, title=self.job_title)
+        job = Job(
+            job_id=self.current_job_id,
+            title=job_title(self.page_source))
         session.add(job)
 
         try:
@@ -329,7 +251,7 @@ class JobsHandler(TabsHandler):
         session.commit()
 
         self.set_current_job_obj(job)
-        self.current_job_payment = self.get_current_job_payment()
+        self.current_job_payment = get_payment(self.page_source)
         print("Successfully stored current job page data.")
         return True
 
@@ -362,11 +284,15 @@ class JobsHandler(TabsHandler):
         # if it doesn't have any choices, delete it
         choices_ok = True
         if JobsHandler.current_job_obj:
-            for sub in JobsHandler.current_job_obj.submission_items:
-                # Even if one submission field does not have choices, do not select
-                if not len(sub.choices) > 0:
-                    choices_ok = False
-                    break
+            try:
+                for sub in JobsHandler.current_job_obj.submission_items:
+                    # Even if one submission field does not have choices, do not select
+                    if not len(sub.choices) > 0:
+                        choices_ok = False
+                        break
+            except PendingRollbackError:
+                session.rollback()
+
             if not choices_ok:
                 session.delete(self.current_job_obj)
                 session.commit()
@@ -376,8 +302,8 @@ class JobsHandler(TabsHandler):
         self.current_job_id = None
         self.current_job_payment = None
 
-        self.close_junk_tabs()
-        self.close_doing_job_tab()
+        TabsHandler.close_junk()
+        TabsHandler.close_doing_job_tab()
         LiveControls.set_default()
 
         wh = MainScreenWidgetsHandler()
@@ -391,27 +317,14 @@ class JobsHandler(TabsHandler):
         Clicks the submit button.
         WARNING: Should only use after filling all the proofs successfully.
         """
-        if self.go_to_doing_job_tab():
+        if TabsHandler.go_to_doing_job_tab():
             driver = get_driver()
             try:
                 driver.execute_script(open('js/click-submit-button.js').read())
                 sys_logger.error(f"Job submitted")
             except Exception as e:
                 sys_logger.error(f"Job submission failed: {e}")
-            self.update_daily_earnings()
-
-    def update_daily_earnings(self):
-        # Try to update the database for calculating the daily earning.
-        today = str(datetime.now()).split()[0]
-        record = session.query(Earnings).filter(Earnings.date.__eq__(today)).first()
-        if record:
-            record.tasks = record.tasks + 1
-            record.usd = record.usd + self.current_job_payment
-            session.commit()
-        else:
-            # First job submission today
-            session.add(
-                Earnings(date=today, tasks=1, usd=self.current_job_payment))
+            update_daily_earnings(get_payment(self.page_source))
 
     def hide_job(self):
         """
@@ -422,17 +335,17 @@ class JobsHandler(TabsHandler):
         if not LiveControls.driver:
             return
 
-        self.go_to_doing_job_tab()
+        TabsHandler.go_to_doing_job_tab()
         try:
-            self.driver = LiveControls.driver
-            hide_link = self.driver.find_element(By.CLASS_NAME, HIDE_JOB_CLSNAME)
-            self.actions = ActionChains(self.driver)
+            driver = get_driver()
+            hide_link = driver.find_element(By.CLASS_NAME, HIDE_JOB_CLSNAME)
+            self.actions = ActionChains(driver)
             self.actions.move_to_element(hide_link).perform()
             hide_link.click()
             time.sleep(1)
 
-            self.close_active_tab()
-            self.close_junk_tabs()
+            TabsHandler.close_active_tab()
+            TabsHandler.close_junk()
             logger.info('Job Hiding Successful.')
             sys_logger.info('Job Hiding Successful.')
         except (NoSuchElementException,
@@ -447,11 +360,14 @@ class JobsHandler(TabsHandler):
         Check for code submission
         :return:
         """
-        for label in self.get_ap_section():
-            match = [match for match in RE_CODE_SUBMIT.finditer(label)]
+        ap_section = get_ap_section(self.page_source)
+        for label in get_ap_section(self.page_source):
+            match = [match for match in RE_CODE_SUBMIT.finditer(ap_section[label])]
             if match:
                 sys_logger.debug(f"Code submission detected")
                 return True
+            else:
+                print(f"\n\n==== Code Submission not required for ===\n{ap_section[label]}")
         return False
 
     @property
@@ -459,3 +375,103 @@ class JobsHandler(TabsHandler):
         for sub_item in self.current_job_obj.submission_items:
             if str(sub_item.field_id).startswith('file'):
                 return True
+
+
+def update_daily_earnings(payment):
+    # Try to update the database for calculating the daily earning.
+    today = str(datetime.now()).split()[0]
+    record = session.query(Earnings).filter(Earnings.date.__eq__(today)).first()
+    if record:
+        record.tasks = record.tasks + 1
+        record.usd = record.usd + payment
+        session.commit()
+    else:
+        # First job submission today
+        session.add(
+            Earnings(date=today, tasks=1, usd=payment))
+
+
+"""
+FUNCTIONS
+"""
+
+
+def get_ap_section(page_source) -> dict:
+    soup = BeautifulSoup(page_source, 'lxml')
+    steps = {group.label['for']: get_clean_step(str_cleaner(
+        BeautifulSoup(str(group.label), 'lxml').text))
+        for group in soup.find(
+            'form', {"id": "task-proofs"}).find(
+            'div', {"class": "job-info-list"}).find_all(
+            "div", {'class': 'form-group'}) if group.label}
+
+    if not steps:
+        logger.warning("Actual Proofs could not be determined.")
+    return steps
+
+
+def get_ji_section(page_source) -> list:
+    soup = BeautifulSoup(page_source, 'lxml')
+    steps = [str_cleaner(step.text) for step in
+             soup.find('div', {"id": "job-instructions"}).find_all('li')]
+    if not steps:
+        logger.warning("Job Info could not be determined.")
+    return steps
+
+
+def job_title(page_source) -> str:
+    soup = BeautifulSoup(page_source, 'lxml')
+    title = soup.select_one(f".{JOB_TITLE_CLASS}").text
+    return str_cleaner(title)
+
+
+def get_payment(page_source) -> float:
+    soup = BeautifulSoup(page_source, 'lxml')
+    price = soup.find('div', {'class': JOB_PAYMENT_CLASS}).find('span').text
+    return float(price)
+
+
+def get_job_page_source():
+    try:
+        TabsHandler.go_to_doing_job_tab()
+        driver = get_driver()
+        if driver.current_url.startswith(DOING_JOB_PAGE_INITIALS):
+            source = driver.page_source
+
+            try:
+                """
+                Replace all the <br> tags from the whole html page. This is done to prevent
+                matching wrong urls form the Ji_section. If this method did not use before
+                storing data into table[current_job_data], wrong and invalid urls will be opened
+                by [JobsHandler.open_req_urls()]
+                :param html:
+                :return:
+                """
+                rm_br = re.sub(r"<br>|</br>|<br/>", " ", get_ascii(source))
+                sys_logger.debug("Current job page source returned")
+                return rm_br
+            except Exception as e:
+                sys_logger.error(f"Error when removing <br> from source: {e}")
+
+    except Exception as e:
+        logger.error(f"Error when getting current job page source: {e}")
+        sys_logger.error(f"Error when getting current job page source: {e}")
+
+
+def get_job_url(job_id) -> str:
+    """
+    Give me the job id and I will give you the url of the job
+    """
+    return f'{DOING_JOB_PAGE_INITIALS}{job_id}'
+
+
+def get_clean_step(step: str) -> str:
+    """
+    Clean the step given by removing initial number, dot and other spaces that exists at the
+    beginning and the end of the step. This method is used to provide much cleaner text for the
+    Ai module and database storage.
+    :return:
+    """
+    cleaned = re.sub(r'^\d\.\s', '', step)
+    cleaned = re.sub(r'\|', ' ', cleaned)
+    return cleaned.strip('\n :>')

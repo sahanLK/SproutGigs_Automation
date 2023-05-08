@@ -5,9 +5,11 @@ import time
 from PyQt5.QtWidgets import QAction, QVBoxLayout, QScrollArea, QGroupBox, QPushButton
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import QMainWindow, QDialog
-from functions.driverfns import get_driver
+from sqlalchemy import and_
+
+from functions.driverfns import get_driver, modify_doing_job_page
 from functions.fns import get_file_logger, get_syslogger
-from jobshandler import JobsHandler
+from jobshandler import JobsHandler, get_job_url, get_job_page_source, get_ji_section, get_ap_section
 from livecontrols import LiveControls
 from miner import BlogData, AdData
 from tabshandler import TabsHandler
@@ -29,7 +31,7 @@ sys_logger = get_syslogger()
 
 jh = JobsHandler()
 Kf = KeyFunctions()
-tabs_handler = TabsHandler()
+tab_h = TabsHandler()
 session = get_session()
 
 
@@ -145,7 +147,7 @@ class JobUpdateWidget(QWidget):
         """
         sub_item_text = self.widget.item_text.text()
         field_id = self.get_field_id(sub_item_text)
-        jh.go_to_doing_job_tab()
+        TabsHandler.go_to_doing_job_tab()
         if val not in self.cache:
             self.fill_to_page(field_id, val)
         self.add_to_cache(val)
@@ -268,11 +270,6 @@ class MainScreen(QMainWindow, Ui_MainScreen):
     """
 
     """
-    Signal: Update the widget areas.
-    """
-    sig_update_widgets = pyqtSignal()
-
-    """
     Signal: Job details update dialog open
     """
     sig_job_update = pyqtSignal()
@@ -317,8 +314,12 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         autopilot_action.triggered.connect(self.activate_auto_pilot)
         autopilot_action.setCheckable(True)
 
+        update_window_action = QAction(QIcon("./icons/help.png"), '', self)
+        update_window_action.triggered.connect(self.sig_job_update.emit)
+
         # Adding actions into toolbar
         self.toolBar.addAction(autopilot_action)
+        self.toolBar.addAction(update_window_action)
 
         # Defining button actions
         self.but_go.clicked.connect(self._thread_miner_submit)
@@ -439,6 +440,8 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         widget_layout.setSpacing(0)
 
         job: Job = JobsHandler.current_job_obj
+        if not job:
+            return
 
         # All the update widgets
         widgets = []
@@ -549,7 +552,7 @@ class MainScreen(QMainWindow, Ui_MainScreen):
 
             # Fill the box
             choice = random.choice(list(sub_item.choices))
-            tabs_handler.go_to_doing_job_tab()
+            tab_h.go_to_doing_job_tab()
             JobUpdateWidget.fill_to_page(sub_item.field_id, choice.text)
 
         # Enable the button again
@@ -573,58 +576,98 @@ class MainScreen(QMainWindow, Ui_MainScreen):
         Fully safe 100% automated action that select and submit tasks automatically
         using the previously submitted tasks.
         """
-        driver = get_driver()
 
-        # get all the choices available jobs
-        jobs = set()
-        for job in session.query(Job).all():
-            choices_ok = True
-            for sub in job.submission_items:
-                # Even if one submission field does not have choices, do not select
-                if not len(sub.choices) > 0:
-                    choices_ok = False
-                    break
-            if choices_ok:
-                jobs.add(job)
+        def _thread():
+            driver = get_driver()
+            if not driver:
+                return
 
-        # Complete selected jobs one by one
-        for job in jobs:
-            url = jh.get_job_url(job.job_id)
-            driver.open_url(url, target='_blank', force_chk_config=False)
-            if not jh.go_to_doing_job_tab():
-                logger.warning(
-                    "Job has expired or another error occurred when switching to tab")
-                continue
+            jh.update_jobs()
+            for job_id in jh.get_all_job_ids():
+                TabsHandler.close_junk()
+                TabsHandler.close_doing_job_tab()
+                job_url = get_job_url(job_id)
+                driver.open_url(job_url, target='_blank')
+                modify_doing_job_page()
+                source = get_job_page_source()
 
-            for sub_item in job.submission_items:
-                # real textarea id of the submission page
-                textarea_id = sub_item.field_id
-                val = random.choice(sub_item.choices).text
-                # Fill the proofs
-                driver.execute_script(f"$('{textarea_id}').val('{val}');")
+                if not source:
+                    continue
 
-            # # Start the submit button click process
-            # btn_text = driver.execute_script("return $('#submit-proof-btn').text();")
-            # btn_text = str(btn_text).lower().strip()
-            #
-            # if not btn_text == 'submit proof':
-            #     # Probably I need to wait some time before submission
-            #     _time = btn_text.split(' ')[1]
-            #     try:
-            #         minutes, seconds = int(_time.split(':')[0]), int(_time.split(':')[1])
-            #         total_wait = (minutes * 60) + seconds + 2
-            #         print(f"Waiting {total_wait} seconds for submission")
-            #         time.sleep(total_wait)
-            #     except ValueError:
-            #         logger.error(f"Error when splitting time counter value with: {_time}")
-            #         break
-            #
-            # # All good submit the job
-            # driver.execute_script("$('#submit-proof-btn').click();")
+                ji_section: list = get_ji_section(source)
+                ap_section: dict = get_ap_section(source)
+                print(ap_section)
+                lst_ap_section: list = [ap_section[ap] for ap in ap_section]
+                print("\n\n list ap")
+                print(lst_ap_section)
 
-            # # wait more than a monite before next job
-            print("Waiting more than a minute")
-            time.sleep(60 + random.randint(2, 10))
+                # Check if this job has previously completed
+                prev_job = None
+                for job in session.query(Job).all():
+                    job: Job
+                    prev_job_ins = [i.text for i in job.instruction_items]
+                    prev_job_sub = [s.text for s in job.submission_items]
+
+                    if prev_job_sub == lst_ap_section \
+                            and prev_job_ins == ji_section:
+                        prev_job = job
+                        print("Match found")
+                        break
+                    else:
+                        # Not a match
+                        with open('not_matched.txt', 'a') as f:
+                            text = f"\n\n=============\n" \
+                                   f"Selected Job Instructions\n{str(ji_section)}\n" \
+                                   f"Previous Job Instructions\n{str(prev_job_ins)}\n\n" \
+                                   f"Selected Job Submission items:\n{str(lst_ap_section)}\n" \
+                                   f"Prev Job Submission Items: \n{str(prev_job_sub)}\n" \
+                                   f"================"
+                            f.write(text)
+
+                # If a match found start the submission process
+                if isinstance(prev_job, Job):
+                    TabsHandler.go_to_doing_job_tab()
+                    for sub_item in prev_job.submission_items:
+                        # real textarea id of the submission page
+                        textarea_id = sub_item.field_id
+                        print("Textarea ID: ", textarea_id)
+                        try:
+                            val = random.choice(sub_item.choices).text
+                        except IndexError:
+                            continue
+                        print("Value: ", val)
+                        # Fill the proofs
+                        driver.execute_script(f"$('{textarea_id}').val('{val}');")
+                else:   # Not a match
+                    continue
+
+                # # Start the submit button click process
+                btn_text = driver.execute_script("return $('#submit-proof-btn').text();")
+                btn_text = str(btn_text).lower().strip()
+                print("Button Text: ", btn_text)
+
+                if not btn_text == 'submit proof':
+                    # Probably I need to wait some time before submission
+                    _time = btn_text.split(' ')[1]
+                    try:
+                        minutes, seconds = int(_time.split(':')[0]), int(_time.split(':')[1])
+                        total_wait = (minutes * 60) + seconds + 2
+                        print(f"Waiting {total_wait} seconds for submission")
+                        time.sleep(total_wait)
+                    except ValueError:
+                        print(f"Error when splitting time counter value with: {_time}")
+
+                # All good submit the job
+                print("Time to click the submit button")
+                # driver.execute_script("$('#submit-proof-btn').click();")
+
+                # # wait more than a monite before next job
+                wait = 60 + random.randint(2, 10)
+                print(f"Waiting {wait} minutes")
+                time.sleep(wait)
+
+        t = threading.Thread(target=_thread)
+        t.start()
 
     def job_skip(self):
         """
